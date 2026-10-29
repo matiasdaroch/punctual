@@ -89,6 +89,16 @@ export interface TeamMember {
 // ---------------------------------------------------------------------------
 
 export type LocationType = 'google_meet' | 'custom_link' | 'phone' | 'in_person'
+
+/**
+ * One place a guest may choose to meet. A `phone` or `in_person` option with
+ * no `value` is one the GUEST fills in: their number, or the address of
+ * their site.
+ */
+export interface LocationOption {
+  type: LocationType
+  value: string | null
+}
 export type SchedulingType = 'personal' | 'round_robin' | 'collective'
 
 export interface EventTypeQuestion {
@@ -142,6 +152,18 @@ export interface EventType {
   maxPerDay: number | null
   locationType: LocationType
   locationValue: string | null
+  /**
+   * Further durations a guest may pick, in minutes, besides
+   * `durationMinutes` (the default). Empty or absent: the default only.
+   * Optional for the fixtures that predate it; the repository always fills it.
+   */
+  durationOptions?: number[]
+  /**
+   * Further locations a guest may pick, besides `locationType` /
+   * `locationValue` (the default, listed first). Empty or absent: the
+   * default only.
+   */
+  locationOptions?: LocationOption[]
   questions: EventTypeQuestion[]
   /**
    * The event type's own logo (a thumbnail blob key, same convention as
@@ -254,6 +276,13 @@ export interface Booking {
    * external event and therefore a fresh link.
    */
   conferenceUrl: string | null
+  /**
+   * The location the guest chose, when the event type offered a choice;
+   * null means the event type's default. `locationValue` carries what the
+   * guest typed for an option they fill in (their phone, their address).
+   */
+  locationType?: LocationType | null
+  locationValue?: string | null
   rescheduleOf: string | null
   rescheduledTo: string | null
   /** Rotated on reschedule so links in superseded emails die (ADR-0005 §4). */

@@ -6,6 +6,7 @@
  * going out.
  */
 
+import { forBooking } from '../core/domain/booking-options.js'
 import type { EnginePorts } from '../ports.js'
 import type { Booking, EventType, User } from '../core/domain/types.js'
 
@@ -77,7 +78,7 @@ async function sendReminders(ports: EnginePorts, now: number): Promise<void> {
     const due = await repos.bookings.dueBetween(w.from, w.to)
     for (const booking of due) {
       const [eventType, host] = await Promise.all([
-        repos.eventTypes.byId(booking.eventTypeId),
+        repos.eventTypes.byId(booking.eventTypeId).then((et) => forBooking(et, booking)),
         repos.users.byId(booking.hostUserId),
       ])
       if (!eventType || !host) continue
@@ -129,7 +130,7 @@ export async function sendDigests(ports: EnginePorts, now: number): Promise<void
     if (todays.length === 0) continue
     const meetings: Array<{ booking: Booking; eventType: EventType; coHosts: User[] }> = []
     for (const booking of todays) {
-      const eventType = await repos.eventTypes.byId(booking.eventTypeId)
+      const eventType = forBooking(await repos.eventTypes.byId(booking.eventTypeId), booking)
       if (!eventType) continue
       const coHosts: User[] = []
       for (const id of booking.hostUserIds.filter((h) => h !== host.id)) {

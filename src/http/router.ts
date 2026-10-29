@@ -29,7 +29,17 @@ import { docsApiPage, docsIndexPage, docsMcpPage, docsSelfHostingPage } from './
 import type { EnginePorts, RequestScope } from '../ports.js'
 import type { SlotService } from '../engine.js'
 import { daysWithSlots, monthRange } from '../engine.js'
-import type { EventType, User } from '../core/domain/types.js'
+import type { EventType, LocationOption, User } from '../core/domain/types.js'
+import {
+  durationChoices,
+  forBooking,
+  guestSupplies,
+  locationChoices,
+  pickDuration,
+  pickLocation,
+  withDuration,
+} from '../core/domain/booking-options.js'
+import { describeLocation } from '../core/ics.js'
 import { hostUsers as hostUsers_, resolveHosts as resolveEventTypeHosts } from '../core/domain/hosts.js'
 import { isValidTimeZone, localDateString } from '../core/time/zone.js'
 import {
@@ -316,7 +326,12 @@ export function buildRouter(ports: EnginePorts, slots: SlotService): Hono<{ Bind
     // One round trip, not two awaits — see EventTypeRepository.bookingPageContext.
     const ctx = await repos.eventTypes.bookingPageContext(userSlug, eventSlug)
     if (!ctx) return notFound(c, ports)
-    const { host, eventType, team, companyLogo } = ctx
+    const { host, team, companyLogo } = ctx
+    // The guest's length (?duration=) shapes which times exist, so it is
+    // applied before anything reads the event type; ?location= only
+    // preselects the confirm form (core/domain/booking-options.ts).
+    const choice = readChoice(ctx.eventType, c.req.query('duration'), c.req.query('location'))
+    const eventType = choice.eventType
 
     const guestTimezone = resolveGuestTimezone(c.req.query('tz'), c.req.raw, host.tz)
     const embed = c.req.query('embed') === '1'
@@ -394,6 +409,7 @@ export function buildRouter(ports: EnginePorts, slots: SlotService): Hono<{ Bind
       guestTimezone,
       baseUrl: ports.config.baseUrl,
       embed,
+      ...choice.pageFields,
     }
 
     const head =
@@ -467,7 +483,9 @@ export function buildRouter(ports: EnginePorts, slots: SlotService): Hono<{ Bind
     const { userSlug, eventSlug } = c.req.param()
     const ctx = await repos.eventTypes.bookingPageContext(userSlug, eventSlug)
     if (!ctx) return notFound(c, ports)
-    const { host, eventType, team, companyLogo } = ctx
+    const { host, team, companyLogo } = ctx
+    const choice = readChoice(ctx.eventType, c.req.query('duration'), c.req.query('location'))
+    const eventType = choice.eventType
 
     const start = Number(c.req.query('start'))
     if (!Number.isSafeInteger(start) || Math.abs(start) > 8.64e15) return notFound(c, ports)
@@ -489,6 +507,7 @@ export function buildRouter(ports: EnginePorts, slots: SlotService): Hono<{ Bind
       baseUrl: ports.config.baseUrl,
       embed,
       confirmStart: start,
+      ...choice.pageFields,
     }
 
     const html =
@@ -523,9 +542,11 @@ export function buildRouter(ports: EnginePorts, slots: SlotService): Hono<{ Bind
     const repos = ports.repositories({ consistency: 'bookmark' })
     const ctx = await repos.eventTypes.bookingPageContext(userSlug, eventSlug)
     if (!ctx) return notFound(c, ports)
-    const { host, eventType, team, companyLogo } = ctx
+    const { host, team, companyLogo } = ctx
 
     const form = await c.req.formData()
+    const choice = readChoice(ctx.eventType, form.get('duration')?.toString(), form.get('location')?.toString())
+    const eventType = choice.eventType
     const start = Number(form.get('start'))
     // Finite is not enough: 1e20 passes and then throws inside Intl, which
     // surfaces as a bare 500. 8.64e15 is the JS Date range.
@@ -557,6 +578,7 @@ export function buildRouter(ports: EnginePorts, slots: SlotService): Hono<{ Bind
       baseUrl: ports.config.baseUrl,
       embed,
       confirmStart: start,
+      ...choice.pageFields,
     }
 
     const { validateAnswers, isValidEmail, pickDeclaredAnswers } = await import(
@@ -570,6 +592,8 @@ export function buildRouter(ports: EnginePorts, slots: SlotService): Hono<{ Bind
     // BOTH confirmations are lost while the slot stays booked.
     else if (name.length > 200) errors['name'] = 'Please use 200 characters or fewer'
     if (!isValidEmail(email)) errors['email'] = 'Please enter a valid email address'
+    const located = readLocation(ctx.eventType, form)
+    if ('error' in located) errors[located.field] = located.error
 
     if (Object.keys(errors).length > 0) {
       return c.html(
@@ -580,7 +604,7 @@ export function buildRouter(ports: EnginePorts, slots: SlotService): Hono<{ Bind
           // effective question has a different id needs to reappear under
           // THAT id, or confirmForm's `values[q.id]` lookup renders it as
           // empty and the guest's typed text looks lost on the error page.
-          confirmForm(data, start, { errors, values: { name, email, ...declared }, holdId }) +
+          confirmForm(data, start, { errors, values: { name, email, ...declared, ...locationFormValues(form) }, holdId }) +
           shellFoot(true, embed, displayCompany(data)),
         400,
       )
@@ -598,6 +622,7 @@ export function buildRouter(ports: EnginePorts, slots: SlotService): Hono<{ Bind
       answers: declared,
       holdId,
       idempotencyKey: c.req.header('idempotency-key') ?? undefined,
+      ...('location' in located && located.location ? { location: located.location } : {}),
     })
 
     if (!outcome.ok) {
@@ -637,6 +662,7 @@ export function buildRouter(ports: EnginePorts, slots: SlotService): Hono<{ Bind
           start: outcome.booking.startUtc,
           guestTimezone,
           manageUrl,
+          locationLabel: describeLocation(forBooking(ctx.eventType, outcome.booking), outcome.booking.conferenceUrl),
         }) +
         shellFoot(true, embed, displayCompany(data)),
     )
@@ -649,6 +675,64 @@ export function buildRouter(ports: EnginePorts, slots: SlotService): Hono<{ Bind
 
 // ---------------------------------------------------------------------------
 
+/**
+ * The guest's duration and location from `?duration=` / `?location=` (or the
+ * same names posted by the confirm form), against what the event type
+ * offers. A value it does not offer falls back to the default duration and
+ * to no preselected location, never to an error: these arrive in links the
+ * host shares and the guest may edit.
+ */
+function readChoice(
+  base: EventType,
+  rawDuration: string | null | undefined,
+  rawLocation: string | null | undefined,
+): { eventType: EventType; pageFields: { duration?: number; location?: number | null } } {
+  const minutes = pickDuration(base, rawDuration)
+  const location = pickLocation(base, rawLocation)
+  return {
+    eventType: withDuration(base, minutes),
+    pageFields: {
+      ...(durationChoices(base).length > 1 ? { duration: minutes } : {}),
+      ...(location !== null ? { location } : {}),
+    },
+  }
+}
+
+/**
+ * The location the confirm form posted: the checked radio and, for an
+ * option the guest fills in, the field under it. Nothing to read when the
+ * event type offers a single place.
+ */
+function readLocation(
+  base: EventType,
+  form: FormData,
+): { location: LocationOption | null } | { error: string; field: string } {
+  const choices = locationChoices(base)
+  if (choices.length < 2) return { location: null }
+  const index = pickLocation(base, form.get('location')?.toString())
+  if (index === null) return { error: 'Please choose where to meet', field: 'location' }
+  const option = choices[index]!
+  if (!guestSupplies(option)) return { location: option }
+  const field = `location_detail_${index + 1}`
+  const typed = String(form.get(field) ?? '').trim()
+  if (typed === '') {
+    return {
+      error: option.type === 'phone' ? 'Please give a number we can call' : 'Please give the address',
+      field,
+    }
+  }
+  if (typed.length > 500) return { error: 'Please use 500 characters or fewer', field }
+  return { location: { type: option.type, value: typed } }
+}
+
+/** What the guest typed into the location fields, to refill the form after an error. */
+function locationFormValues(form: FormData): Record<string, string> {
+  const out: Record<string, string> = {}
+  for (const [k, v] of form.entries()) {
+    if (k === 'location' || k.startsWith('location_detail_')) out[k] = String(v)
+  }
+  return out
+}
 
 /**
  * The guest's timezone.

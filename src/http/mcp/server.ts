@@ -27,6 +27,7 @@
  * transport failure.
  */
 
+import { forBooking } from '../../core/domain/booking-options.js'
 import { Hono } from 'hono'
 import { isValidEmail } from '../../core/domain/booking-service.js'
 import { notifyBookingCancelled } from '../../adapters/notify.js'
@@ -734,7 +735,7 @@ async function rescheduleBooking(
     return toolError(`That booking is already ${original.status} and cannot be moved.`)
   }
 
-  const eventType = await repos.eventTypes.byId(original.eventTypeId)
+  const eventType = forBooking(await repos.eventTypes.byId(original.eventTypeId), original)
   if (!eventType) return toolError('The event type for that booking no longer exists.')
 
   // Who the moved meeting is with — see `hostsForReschedule`.
@@ -839,7 +840,7 @@ async function cancelBooking(deps: ToolDeps, input: z.infer<typeof cancelArgs>):
   // The tool description promises "notify the guest", and nothing was sending
   // anything — an agent could cancel a real meeting and the guest would find
   // out by turning up to it.
-  const cancelEt = await repos.eventTypes.byId(booking.eventTypeId)
+  const cancelEt = forBooking(await repos.eventTypes.byId(booking.eventTypeId), booking)
   const cancelHost = await repos.users.byId(booking.hostUserId)
   if (cancelEt && cancelHost) {
     await notifyBookingCancelled({

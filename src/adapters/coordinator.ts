@@ -7,14 +7,22 @@
  */
 
 import type {
+  BookingAttempt,
   BookingOutcome,
   EnginePorts,
   HoldRequest,
   HostCoordinator,
   Repositories,
 } from '../ports.js'
-import type { Booking } from '../core/domain/types.js'
+import type { Booking, EventType, LocationOption } from '../core/domain/types.js'
 import { combineBusy, partitionConnections, prepareBooking } from '../core/domain/booking-service.js'
+import {
+  durationChoices,
+  guestSupplies,
+  locationChoices,
+  withDuration,
+  withLocation,
+} from '../core/domain/booking-options.js'
 import { bookingFootprint } from '../core/slots/engine.js'
 import { intervalToBuckets } from '../core/slots/intervals.js'
 import { issueManageToken } from '../core/domain/auth-flows.js'
@@ -104,8 +112,14 @@ export function createCoordinator(deps: CoordinatorDeps): HostCoordinator {
       const leaseId = ports.crypto.randomToken(12)
 
       try {
-        const eventType = await repos.eventTypes.byId(request.eventTypeId)
-        if (!eventType) return { ok: false, reason: 'policy', detail: 'unknown event type' }
+        const baseEventType = await repos.eventTypes.byId(request.eventTypeId)
+        if (!baseEventType) return { ok: false, reason: 'policy', detail: 'unknown event type' }
+        // The guest's duration and location, applied before anything else
+        // reads the event type: the footprint, the re-validation and the
+        // stored booking then all follow the choice.
+        const chosen = await applyChoices(repos, baseEventType, request)
+        if (!chosen.ok) return { ok: false, reason: 'policy', detail: chosen.detail }
+        const eventType = chosen.eventType
 
         // ---- Leases for collective (ADR-0002 §3) ----------------------------
         // Ascending host id order makes deadlock impossible: every caller
@@ -185,6 +199,7 @@ export function createCoordinator(deps: CoordinatorDeps): HostCoordinator {
           bookingId,
           manageTokenHash,
           rescheduleOf: request.rescheduleOf ?? null,
+          location: chosen.location,
           rrContext,
           expectedHostCount: requiredCount,
         })
@@ -387,6 +402,49 @@ export function createCoordinator(deps: CoordinatorDeps): HostCoordinator {
       for (const id of hostUserIds) await stub(id).releaseLease(leaseId).catch(() => {})
     },
   }
+}
+
+type ChoiceResult =
+  | { ok: true; eventType: EventType; location: LocationOption | null }
+  | { ok: false; detail: string }
+
+/**
+ * The attempt's duration (its `end - start`) and location, checked against
+ * what the event type offers and applied to it (core/domain/booking-options.ts).
+ *
+ * A reschedule keeps the original booking's choices: its length passes even if
+ * the host has since dropped that option, and its location carries over unless
+ * the caller picked another one.
+ */
+async function applyChoices(repos: Repositories, base: EventType, request: BookingAttempt): Promise<ChoiceResult> {
+  const original = request.rescheduleOf ? await repos.bookings.byId(request.rescheduleOf) : null
+  const minutes = (request.end - request.start) / 60_000
+  const originalMinutes = original ? Math.round((original.endUtc - original.startUtc) / 60_000) : null
+  if (!Number.isInteger(minutes) || (!durationChoices(base).includes(minutes) && minutes !== originalMinutes)) {
+    return { ok: false, detail: 'that duration is not offered' }
+  }
+
+  let location: LocationOption | null = original?.locationType
+    ? { type: original.locationType, value: original.locationValue ?? null }
+    : null
+  if (request.location) {
+    const asked = request.location
+    const choices = locationChoices(base)
+    // A fixed option matches on kind and details; otherwise the option of
+    // that kind the guest fills in, carrying what they typed.
+    const fixed = choices.find((o) => !guestSupplies(o) && o.type === asked.type && o.value === asked.value)
+    const supplied = fixed ? undefined : choices.find((o) => guestSupplies(o) && o.type === asked.type)
+    if (fixed) location = fixed
+    else if (supplied) {
+      const typed = (asked.value ?? '').trim()
+      if (typed === '') return { ok: false, detail: 'that location needs details from the guest' }
+      location = { type: asked.type, value: typed.slice(0, 500) }
+    } else return { ok: false, detail: 'that location is not offered' }
+  }
+
+  let eventType = withDuration(base, minutes)
+  if (location) eventType = withLocation(eventType, location)
+  return { ok: true, eventType, location }
 }
 
 /**

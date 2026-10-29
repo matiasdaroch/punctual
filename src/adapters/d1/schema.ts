@@ -97,6 +97,9 @@ export const eventTypes = sqliteTable(
     maxPerDay: integer('max_per_day'),
     locationType: text('location_type').notNull().default('google_meet'),
     locationValue: text('location_value'),
+    // Further durations and locations a guest may pick (migration 0018).
+    durationOptionsJson: text('duration_options_json').notNull().default('[]'),
+    locationOptionsJson: text('location_options_json').notNull().default('[]'),
     questionsJson: text('questions_json').notNull().default('[]'),
     active: integer('active').notNull().default(1),
     createdAt: integer('created_at').notNull(),
@@ -222,6 +225,9 @@ export const bookings = sqliteTable(
     externalEventIdsJson: text('external_event_ids_json').notNull().default('{}'),
     // The provider-minted meeting link for THIS booking.
     conferenceUrl: text('conference_url'),
+    // The guest's chosen location; null = the event type's (migration 0018).
+    locationType: text('location_type'),
+    locationValue: text('location_value'),
     // Claimed by the calendar-sync handler to make the confirmation send
     // exactly-once across queue retries.
     confirmationQueuedAt: integer('confirmation_queued_at'),

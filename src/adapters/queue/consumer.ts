@@ -7,6 +7,8 @@
  * than failing the whole batch.
  */
 
+import { forBooking } from '../../core/domain/booking-options.js'
+import { describeLocation } from '../../core/ics.js'
 import type { EnginePorts, ExternalEvent, QueueMessage, Repositories } from '../../ports.js'
 import type { Booking, CalendarConnection, EventType, User } from '../../core/domain/types.js'
 import { calendarDescription, calendarTitle, participantsFor, type Participant } from '../../core/domain/calendar-text.js'
@@ -97,7 +99,7 @@ async function deliverChat(msg: Extract<QueueMessage, { kind: 'chat' }>, ports: 
   if (!channel || !channel.active) return
   const booking = await repos.bookings.byId(msg.bookingId)
   if (!booking) return
-  const eventType = await repos.eventTypes.byId(booking.eventTypeId)
+  const eventType = forBooking(await repos.eventTypes.byId(booking.eventTypeId), booking)
   if (!eventType) return
   const hosts: User[] = []
   for (const id of booking.hostUserIds.length > 0 ? booking.hostUserIds : [booking.hostUserId]) {
@@ -180,7 +182,7 @@ async function syncCalendar(
   // Looked up here, not earlier: a DELETE needs only externalEventIds, and
   // bailing on a missing event type meant deleting an event type stranded its
   // bookings' calendar entries forever.
-  const eventType = await repos.eventTypes.byId(booking.eventTypeId)
+  const eventType = forBooking(await repos.eventTypes.byId(booking.eventTypeId), booking)
   if (!eventType && msg.action !== 'delete') return
   // Accumulated across every provider, then persisted once.
   const createdIds: Record<string, string> = { ...booking.externalEventIds }
@@ -255,10 +257,12 @@ async function syncCalendar(
     // Mint a conference only until ONE exists for this booking; every later
     // event reuses it as the location instead.
     createConference: eventType.locationType === 'google_meet' && !conferenceRequested,
+    // A conference's link once minted; otherwise the place, number or link
+    // the booking was made for, in the same words the emails use.
     location:
-      eventType.locationType === 'in_person'
-        ? (eventType.locationValue ?? undefined)
-        : (conferenceUrl ?? undefined),
+      eventType.locationType === 'google_meet'
+        ? (conferenceUrl ?? undefined)
+        : describeLocation(eventType, conferenceUrl),
   })
 
   /**
@@ -534,7 +538,7 @@ export async function dispatchConfirmation(
 
   const booking = await repos.bookings.byId(bookingId)
   if (!booking || booking.status !== 'confirmed') return
-  const eventType = await repos.eventTypes.byId(booking.eventTypeId)
+  const eventType = forBooking(await repos.eventTypes.byId(booking.eventTypeId), booking)
   if (!eventType) return
   const host = await repos.users.byId(booking.hostUserId)
   if (!host) return

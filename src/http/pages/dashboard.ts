@@ -51,6 +51,7 @@ import { DIGEST_HOURS } from '../../core/domain/digest.js'
 import type { ZoneTraffic } from '../../adapters/insights/zone-analytics.js'
 import { slotStateClassName } from '../../core/slot-state.js'
 import { slugify } from '../../core/domain/booking-service.js'
+import { durationChoices, formatLocationOptions } from '../../core/domain/booking-options.js'
 import { formatInZone, localDateString, offsetLabel } from '../../core/time/zone.js'
 import type { ResolvedHost } from '../../core/domain/hosts.js'
 import { avatarHtml, brandLogoHtml, escapeHtml, hostsSentence, joinNames, logoHtml, shellFoot, shellHead } from './booking.js'
@@ -521,7 +522,7 @@ function eventTypeCard(d: DashboardHomeData, item: EventTypeListItem): string {
     </div>
   </div>
   <ul class="pu-meta pu-et-meta">
-    <li>${et.durationMinutes} min</li>
+    <li>${durationChoices(et).join(" / ")} min</li>
     <li>${escapeHtml(schedulingLabel(et))}</li>
     <li>${escapeHtml(locationLabel(et))}</li>
   </ul>
@@ -594,6 +595,8 @@ export interface EventTypeFormData extends DashboardChrome {
    * exactly the text the host has to correct.
    */
   questionsText?: string
+  /** The guest-choice fields as typed, for the same reason as `questionsText`. */
+  optionsText?: { durations: string; locations: string }
   /**
    * The host's own schedules — the "Availability schedule" choices beside
    * "Default". Same precedent as `teams` above: when there's only the one
@@ -667,8 +670,10 @@ const EVENT_TYPE_FIELD_ORDER: readonly string[] = [
   'minNoticeMinutes',
   'maxHorizonDays',
   'maxPerDay',
+  'durationOptions',
   'locationType',
   'locationValue',
+  'locationOptions',
   'questions',
 ]
 
@@ -869,6 +874,12 @@ ${
         num(et?.maxPerDay, ''),
       )}
       </div>
+      <label for="durationOptions">Other durations the guest can choose</label>
+      <input id="durationOptions" name="durationOptions" maxlength="100" inputmode="numeric"
+             placeholder="45, 60"
+             value="${escapeHtml(d.optionsText?.durations ?? (et?.durationOptions ?? []).join(', '))}"${describedBy('durationOptions', errors)}${autofocusAttr('durationOptions', errors)}>
+      ${fieldError('durationOptions', errors)}
+      <p class="pu-help">Minutes, separated by commas. Blank means the duration above only. Prefill one with <code>?duration=60</code> on the link.</p>
     </fieldset>
 
     <fieldset class="pu-fs">
@@ -889,6 +900,12 @@ ${
         ${fieldError('locationValue', errors)}
         <p class="pu-help">The meeting URL, phone number or address. Google Meet mints its own link.</p>
       </div>
+
+      <label for="locationOptions">More locations the guest can choose</label>
+      <textarea id="locationOptions" name="locationOptions" rows="3"${describedBy('locationOptions', errors)}${autofocusAttr('locationOptions', errors)}
+                placeholder="Phone&#10;In person | 1385 Coral Way, Suite 202, Miami&#10;In person">${escapeHtml(d.optionsText?.locations ?? formatLocationOptions(et?.locationOptions ?? []))}</textarea>
+      ${fieldError('locationOptions', errors)}
+      <p class="pu-help">One per line &mdash; Google Meet, Custom link, Phone or In person, then <code>|</code> and the details. Phone or In person with no details asks the guest for their number or address. Blank means the location above only. Prefill one with <code>?location=phone</code>, <code>meet</code>, <code>in-person</code> or its position, <code>?location=2</code>.</p>
     </fieldset>
 
     <fieldset class="pu-fs">

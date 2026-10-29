@@ -18,8 +18,15 @@
 import type { ResolvedHost } from '../../core/domain/hosts.js'
 import { fitKeyFor, type LogoShape } from '../../core/domain/media.js'
 import type { CompanyLogo,
-  Team, EventType, Slot, User } from '../../core/domain/types.js'
+  Team, EventType, LocationType, Slot, User } from '../../core/domain/types.js'
 import { effectiveQuestions } from '../../core/domain/booking-service.js'
+import {
+  durationChoices,
+  guestFieldLabel,
+  guestSupplies,
+  locationChoices,
+  locationOptionLabel,
+} from '../../core/domain/booking-options.js'
 import { slotStateClassName } from '../../core/slot-state.js'
 import { formatInZone, localDateString, offsetLabel } from '../../core/time/zone.js'
 import { embedResizeScriptTag } from '../embed.js'
@@ -208,6 +215,17 @@ export interface BookingPageData {
   confirmStart?: number
   /** True when served inside the embed iframe (`?embed=1`) — propagated through every internal link so the resize snippet keeps firing past the first navigation. */
   embed?: boolean
+  /**
+   * The guest's chosen duration (`?duration=`), set only when the event type
+   * offers more than one; `eventType` already carries it (withDuration).
+   * Propagated through every internal link, like `embed`.
+   */
+  duration?: number
+  /**
+   * The location a `?location=` prefill picked, as an index into
+   * `locationChoices`; the confirm form preselects it. Propagated like `duration`.
+   */
+  location?: number | null
 }
 
 /**
@@ -391,17 +409,99 @@ function pageHead(d: BookingPageData): string {
 
 export function eventHeader(d: BookingPageData): string {
   const durationLabel = `${d.eventType.durationMinutes} min`
-  const location = locationLabel(d.eventType)
+  const locations = locationChoices(d.eventType)
+  // Several places on offer: name the kinds here, the guest picks one on the confirm form.
+  const location =
+    locations.length > 1
+      ? [...new Set(locations.map((o) => LOCATION_KIND[o.type]))].join(' · ')
+      : locationLabel(d.eventType)
   return `<header class="pu-event-header">
   ${pageHead(d)}
   <h1>${escapeHtml(d.eventType.title)}</h1>
   ${d.eventType.description ? `<p class="pu-muted">${escapeHtml(d.eventType.description)}</p>` : ''}
   <ul class="pu-meta">
-    <li><span class="pu-dot"></span> ${escapeHtml(durationLabel)}</li>
+    ${durationChoices(d.eventType).length > 1 && d.confirmStart === undefined ? `<li>${durationPicker(d)}</li>` : `<li><span class="pu-dot"></span> ${escapeHtml(durationLabel)}</li>`}
     ${location ? `<li>${escapeHtml(location)}</li>` : ''}
     <li>${timezonePicker(d)}</li>
   </ul>
 </header>`
+}
+
+const LOCATION_KIND: Record<LocationType, string> = {
+  google_meet: 'Google Meet',
+  custom_link: 'Video call',
+  phone: 'Phone',
+  in_person: 'In person',
+}
+
+/**
+ * One link per duration on offer, the current one marked. A link, not a
+ * form: picking a length changes which times exist, so it reloads the page
+ * on the same day with `?duration=`, and works with no JS.
+ */
+function durationPicker(d: BookingPageData): string {
+  const current = d.eventType.durationMinutes
+  const where = d.selectedDate ? `date=${encodeURIComponent(d.selectedDate)}` : `month=${encodeURIComponent(d.month)}`
+  const links = durationChoices(d.eventType)
+    .map((minutes) => {
+      const href =
+        `${bookingPath(d)}?${where}&tz=${encodeURIComponent(d.guestTimezone)}${d.embed ? '&embed=1' : ''}` +
+        choiceQuery({ ...d, duration: minutes })
+      return minutes === current
+        ? `<a class="pu-choice" aria-current="true" href="${escapeHtml(href)}">${minutes} min</a>`
+        : `<a class="pu-choice" href="${escapeHtml(href)}" rel="nofollow">${minutes} min</a>`
+    })
+    .join('')
+  return `<nav class="pu-choices" aria-label="Meeting length">${links}</nav>`
+}
+
+/** `&duration=…&location=…` for the guest's choices, appended to every internal link. */
+export function choiceQuery(d: Pick<BookingPageData, 'duration' | 'location'>): string {
+  return (
+    (d.duration !== undefined ? `&duration=${d.duration}` : '') +
+    (d.location !== undefined && d.location !== null ? `&location=${d.location + 1}` : '')
+  )
+}
+
+/** The same choices as hidden fields, for the GET forms (the timezone picker). */
+function choiceHiddenFields(d: BookingPageData): string {
+  return (
+    (d.duration !== undefined ? `<input type="hidden" name="duration" value="${d.duration}">` : '') +
+    (d.location !== undefined && d.location !== null
+      ? `<input type="hidden" name="location" value="${d.location + 1}">`
+      : '')
+  )
+}
+
+/**
+ * The location choice on the confirm form: a radio per option, the prefill
+ * (or the default) checked, and a field under each option the guest fills
+ * in — their number, their address. Rendered only when there is a choice.
+ */
+function locationFieldset(d: BookingPageData, errors: Record<string, string>, values: Record<string, string>): string {
+  const choices = locationChoices(d.eventType)
+  if (choices.length < 2) return ''
+  const picked = values['location'] !== undefined ? Number(values['location']) - 1 : (d.location ?? 0)
+  const items = choices
+    .map((o, i) => {
+      const id = `loc-${i + 1}`
+      const radio = `<label class="pu-radio" for="${id}"><input type="radio" id="${id}" name="location" value="${i + 1}"${i === picked ? ' checked' : ''}> ${escapeHtml(locationOptionLabel(o))}</label>`
+      if (!guestSupplies(o)) return radio
+      const field = `location_detail_${i + 1}`
+      const err = errors[field]
+      return `${radio}
+      <div class="pu-radio-detail">
+        <label for="${field}">${escapeHtml(guestFieldLabel(o))}</label>
+        <input id="${field}" name="${field}" maxlength="500" value="${escapeHtml(values[field] ?? '')}"${o.type === 'phone' ? ' type="tel" autocomplete="tel"' : ' autocomplete="street-address"'}${err ? ` aria-describedby="err-${field}"` : ''}>
+        ${err ? `<p class="pu-err" id="err-${field}">${escapeHtml(err)}</p>` : ''}
+      </div>`
+    })
+    .join('\n      ')
+  return `<fieldset class="pu-fs pu-loc-choice">
+      <legend>Where should we meet?</legend>
+      ${items}
+      ${errors['location'] ? `<p class="pu-err">${escapeHtml(errors['location'])}</p>` : ''}
+    </fieldset>`
 }
 
 // Populated once per isolate, not per request — `Intl.supportedValuesOf`
@@ -472,6 +572,7 @@ function timezonePicker(d: BookingPageData): string {
   const offsetCh = offset.length
   return `<form class="pu-tz-form" method="get" action="${escapeHtml(action)}">
     ${hiddenFields}
+    ${choiceHiddenFields(d)}
     ${d.embed ? '<input type="hidden" name="embed" value="1">' : ''}
     <label class="pu-sr" for="pu-tz">Timezone</label>
     <span class="pu-tz-wrap">
@@ -530,7 +631,8 @@ export function monthGrid(d: BookingPageData): string {
     if (has) {
       const href =
         `${bookingPath(d)}?date=${date}&tz=${encodeURIComponent(d.guestTimezone)}` +
-        (d.embed ? '&embed=1' : '')
+        (d.embed ? '&embed=1' : '') +
+        choiceQuery(d)
       cells.push(
         `<a class="pu-day" data-has-slots="1"${current}${selected} href="${escapeHtml(href)}" ` +
           `aria-label="${escapeHtml(humanDate(date, d.guestTimezone))}, times available` +
@@ -550,7 +652,7 @@ export function monthGrid(d: BookingPageData): string {
   const prev = shiftMonth(d.month, -1)
   const next = shiftMonth(d.month, 1)
   const base = bookingPath(d)
-  const tzq = `&tz=${encodeURIComponent(d.guestTimezone)}${d.embed ? '&embed=1' : ''}`
+  const tzq = `&tz=${encodeURIComponent(d.guestTimezone)}${d.embed ? '&embed=1' : ''}${choiceQuery(d)}`
 
   return `<section class="pu-card" aria-label="Choose a day">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.75rem">
@@ -602,7 +704,8 @@ export function slotList(d: BookingPageData): string {
       const href =
         `${bookingPath(d)}/confirm?start=${s.start}` +
         `&tz=${encodeURIComponent(d.guestTimezone)}` +
-        (d.embed ? '&embed=1' : '')
+        (d.embed ? '&embed=1' : '') +
+        choiceQuery(d)
       // nofollow: every slot is a distinct URL, and a crawler that follows
       // them enumerates the whole calendar — ten thousand confirm fetches
       // in a fortnight on one event type. Nothing on the far side is worth
@@ -677,6 +780,7 @@ export function confirmForm(
     <input type="hidden" name="start" value="${start}">
     <input type="hidden" name="tz" value="${escapeHtml(d.guestTimezone)}">
     ${d.embed ? '<input type="hidden" name="embed" value="1">' : ''}
+    ${d.duration !== undefined ? `<input type="hidden" name="duration" value="${d.duration}">` : ''}
     ${opts.holdId ? `<input type="hidden" name="hold" value="${escapeHtml(opts.holdId)}">` : ''}
     <label for="name">Your name</label>
     <input id="name" name="name" required aria-required="true" autocomplete="name"
@@ -688,10 +792,11 @@ export function confirmForm(
            value="${escapeHtml(values['email'] ?? '')}"
            ${errors['email'] ? 'aria-describedby="err-email"' : ''}>
     ${errors['email'] ? `<p class="pu-err" id="err-email">${escapeHtml(errors['email'])}</p>` : ''}
+    ${locationFieldset(d, errors, values)}
     ${questions}
     <div style="margin-top:1.25rem;display:flex;gap:.75rem;flex-wrap:wrap">
       <button class="pu-btn" type="submit">Confirm booking</button>
-      <a class="pu-btn pu-btn-ghost" href="${escapeHtml(bookingPath(d))}?date=${escapeHtml(localDateString(start, d.guestTimezone))}${d.embed ? '&embed=1' : ''}">Back</a>
+      <a class="pu-btn pu-btn-ghost" href="${escapeHtml(bookingPath(d))}?date=${escapeHtml(localDateString(start, d.guestTimezone))}${d.embed ? '&embed=1' : ''}${escapeHtml(choiceQuery(d))}">Back</a>
     </div>
   </form>
 </section>`
@@ -746,7 +851,7 @@ export function slotTakenPage(d: BookingPageData, date: string): string {
   <h1>That time was just taken</h1>
   <p class="pu-muted">Someone booked it while you were filling in the form. Here are the other times that day.</p>
   <p style="margin-top:1rem">
-    <a class="pu-btn" href="${escapeHtml(bookingPath(d))}?date=${escapeHtml(date)}&tz=${encodeURIComponent(d.guestTimezone)}${d.embed ? '&embed=1' : ''}">See available times</a>
+    <a class="pu-btn" href="${escapeHtml(bookingPath(d))}?date=${escapeHtml(date)}&tz=${encodeURIComponent(d.guestTimezone)}${d.embed ? '&embed=1' : ''}${escapeHtml(choiceQuery(d))}">See available times</a>
   </p>
 </section>`
 }

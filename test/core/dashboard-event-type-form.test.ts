@@ -150,7 +150,7 @@ describe('eventTypeForm — structure', () => {
 
   it('lays the seven numbers out with a help line under every cell', () => {
     const html = eventTypeForm(base)
-    const grid = html.slice(html.indexOf('class="pu-num-grid"'), html.indexOf('<legend>Where</legend>'))
+    const grid = html.slice(html.indexOf('class="pu-num-grid"'), html.indexOf('for="durationOptions"'))
     expect((grid.match(/type="number"/g) ?? []).length).toBe(7)
     expect((grid.match(/class="pu-help"/g) ?? []).length).toBe(7)
     expect(grid).toContain('Minimum notice (minutes, e.g. 1440 = 1 day)')

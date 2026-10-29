@@ -19,6 +19,7 @@
  * payloads should not point at our domain.
  */
 
+import { forBooking } from '../../core/domain/booking-options.js'
 import { Hono } from 'hono'
 import { z } from 'zod'
 import type {
@@ -1082,7 +1083,7 @@ export function buildApiRoutes(ports: EnginePorts, slots: SlotService): Hono<Api
       return problem(409, 'Not cancellable', `This booking is already ${fresh?.status ?? 'no longer confirmed'}.`)
     }
 
-    const eventType = await repos.eventTypes.byId(booking.eventTypeId)
+    const eventType = forBooking(await repos.eventTypes.byId(booking.eventTypeId), booking)
     if (eventType) {
       // Shared with the guest-manage and dashboard cancel paths: sends to
       // BOTH parties with the .ics METHOD:CANCEL, and fires the
@@ -1128,7 +1129,7 @@ export function buildApiRoutes(ports: EnginePorts, slots: SlotService): Hono<Api
       return problem(409, 'Not reschedulable', `This booking is already ${original.status}.`)
     }
 
-    const eventType = await repos.eventTypes.byId(original.eventTypeId)
+    const eventType = forBooking(await repos.eventTypes.byId(original.eventTypeId), original)
     if (!eventType) return notFound('event type')
 
     // Who the moved meeting is with — see `hostsForReschedule`: a co-host

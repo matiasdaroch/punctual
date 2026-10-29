@@ -14,6 +14,7 @@
  * never the change.
  */
 
+import { forBooking } from './booking-options.js'
 import type { EnginePorts, Repositories, BucketClaim } from '../../ports.js'
 import type { Booking, User } from './types.js'
 import { canManageTeam } from './teams.js'
@@ -60,7 +61,7 @@ export async function changeBookingHosts(
 
   const booking = await repos.bookings.byId(input.bookingId)
   if (!booking || booking.status !== 'confirmed') return { ok: false, reason: 'not_found' }
-  const eventType = await repos.eventTypes.byId(booking.eventTypeId)
+  const eventType = forBooking(await repos.eventTypes.byId(booking.eventTypeId), booking)
   if (!eventType) return { ok: false, reason: 'not_found' }
 
   // Older rows may carry an empty list next to the primary column.

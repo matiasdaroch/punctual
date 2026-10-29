@@ -358,6 +358,15 @@ time,.pu-time{font-family:var(--pu-font-mono);font-variant-numeric:tabular-nums}
 @media (prefers-color-scheme:dark){:root:not([data-theme=light]) .pu-logo-light{display:none}:root:not([data-theme=light]) .pu-logo-dark{display:inline}}
 :root[data-theme=dark] .pu-logo-light{display:none}
 :root[data-theme=dark] .pu-logo-dark{display:inline}
+.pu-choices{display:inline-flex;flex-wrap:wrap;gap:.25rem}
+.pu-choice{padding:.2rem .6rem;border:1px solid var(--pu-border-subtle);border-radius:var(--pu-radius);
+  color:var(--pu-text-primary);text-decoration:none;font-size:.875rem}
+.pu-choice:hover{border-color:var(--pu-green-700)}
+.pu-choice[aria-current]{background:var(--pu-green-fill);border-color:var(--pu-green-fill);color:var(--pu-text-on-accent)}
+.pu-loc-choice{margin-top:1rem}
+.pu-radio{display:flex;align-items:center;gap:.5rem;font-weight:400;margin:.4rem 0}
+.pu-radio input{width:auto;margin:0}
+.pu-radio-detail{margin:0 0 .5rem 1.6rem}
 
 .pu-grid{display:grid;gap:1.5rem;grid-template-columns:1fr}
 @media(min-width:780px){.pu-grid{grid-template-columns:300px 1fr}}

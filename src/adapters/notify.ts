@@ -25,10 +25,12 @@ import {
 import {
   ICS_CANCEL_CONTENT_TYPE,
   buildIcs,
+  describeLocation,
   icsCancelSuppressed,
   icsSequenceForBooking,
   icsUidForBooking,
 } from '../core/ics.js'
+import { forBooking } from '../core/domain/booking-options.js'
 
 /** A booking known to have no predecessor gets an empty chain, not `undefined`. */
 const NO_CHAIN: ReadonlyMap<string, Booking> = new Map()
@@ -168,6 +170,9 @@ export async function notifyWebhooks(
   extra: Record<string, unknown> = {},
 ): Promise<void> {
   const repos = ports.repositories({ consistency: 'unconstrained' })
+  // As this booking used it: its chosen duration and location, for the
+  // fields below (core/domain/booking-options.ts).
+  const used = forBooking(eventType, booking)
   // Every participating host's subscriptions, not just the primary's — a
   // collective booking is equally an event for each of them.
   const seen = new Set<string>()
@@ -193,6 +198,13 @@ export async function notifyWebhooks(
             guestTimezone: booking.guestTimezone,
             start: new Date(booking.startUtc).toISOString(),
             end: new Date(booking.endUtc).toISOString(),
+            durationMinutes: used.durationMinutes,
+            location: {
+              type: used.locationType,
+              value: used.locationValue,
+              description: describeLocation(used, booking.conferenceUrl),
+            },
+            conferenceUrl: booking.conferenceUrl,
             status: booking.status,
             rescheduleOf: booking.rescheduleOf,
             answers: booking.answers,

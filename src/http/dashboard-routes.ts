@@ -29,6 +29,13 @@
  *     each write.
  */
 
+import {
+  MAX_DURATION_OPTIONS,
+  MAX_LOCATION_OPTIONS,
+  forBooking,
+  parseDurationOptions,
+  parseLocationOptions,
+} from '../core/domain/booking-options.js'
 import { Hono, type Context, type MiddlewareHandler } from 'hono'
 import { notifyBookingCancelled, notifyWebhooks } from '../adapters/notify.js'
 import { dispatchConfirmation } from '../adapters/queue/consumer.js'
@@ -792,8 +799,8 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
 
     const user = c.get('user')
     const repos = c.get('repos')
-    const { draft, questionsText } = readEventTypeForm(form, user.id)
-    const errors = await validateEventType(repos, user, draft, questionsText, null)
+    const { draft, questionsText, optionsText } = readEventTypeForm(form, user.id)
+    const errors = await validateEventType(repos, user, draft, questionsText, null, optionsText)
     if (Object.keys(errors).length > 0) {
       return c.html(
         eventTypeForm({
@@ -804,6 +811,7 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
         ...(emailProblem ? { emailProblem } : {}),
           eventType: draft,
           questionsText,
+          optionsText,
           errors,
           teams: await managedTeams(c),
           schedules: await repos.availability.listForUser(user.id),
@@ -840,7 +848,7 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
     const repos = c.get('repos')
     const read = readEventTypeForm(form, user.id)
     const draft = { ...read.draft, id: existing.id, createdAt: existing.createdAt }
-    const errors = await validateEventType(repos, user, draft, read.questionsText, existing.id)
+    const errors = await validateEventType(repos, user, draft, read.questionsText, existing.id, read.optionsText)
 
     // The Hosts block only exists for the team the event type was SAVED
     // under: a change of owner clears the set (every member of the new
@@ -890,6 +898,7 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
         ...(emailProblem ? { emailProblem } : {}),
           eventType: draft,
           questionsText: read.questionsText,
+          optionsText: read.optionsText,
           teams: await managedTeams(c),
           schedules: await repos.availability.listForUser(user.id),
           hostChoices: drafted,
@@ -910,6 +919,7 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
         ...(emailProblem ? { emailProblem } : {}),
           eventType: draft,
           questionsText: read.questionsText,
+          optionsText: read.optionsText,
           errors,
           teams: await managedTeams(c),
           schedules: await repos.availability.listForUser(user.id),
@@ -936,6 +946,7 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
         ...(emailProblem ? { emailProblem } : {}),
             eventType: draft,
             questionsText: read.questionsText,
+            optionsText: read.optionsText,
             errors: { hosts: 'A host is no longer on the team, or a schedule was deleted. Reload the page and try again.' },
             teams: await managedTeams(c),
             schedules: await repos.availability.listForUser(user.id),
@@ -2742,7 +2753,7 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
     const user = c.get('user')
     const booking = await repos.bookings.byId(c.req.param('id') ?? '')
     if (!booking) return null
-    const eventType = await repos.eventTypes.byId(booking.eventTypeId)
+    const eventType = forBooking(await repos.eventTypes.byId(booking.eventTypeId), booking)
     const attends = booking.hostUserId === user.id || booking.hostUserIds.includes(user.id)
     const team = eventType?.ownerTeamId ? await repos.teams.byId(eventType.ownerTeamId) : null
     const manages = team ? await managesTeam(c, team.id) : false
@@ -3060,7 +3071,7 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
     // §4 names rotation-on-state-change as THE invalidation mechanism.
     await repos.bookings.rotateManageToken(booking.id, await ports.crypto.hash(ports.crypto.randomToken(32)))
 
-    const eventType = await repos.eventTypes.byId(booking.eventTypeId)
+    const eventType = forBooking(await repos.eventTypes.byId(booking.eventTypeId), booking)
     const host = await repos.users.byId(booking.hostUserId)
     if (eventType && host) {
       const hosts = (await Promise.all([...attendingIds(booking)].map((id) => repos.users.byId(id)))).filter(
@@ -3205,7 +3216,7 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
 
     const { booking, purpose } = verified
     const repos = ports.repositories(guestScope())
-    const eventType = await repos.eventTypes.byId(booking.eventTypeId)
+    const eventType = forBooking(await repos.eventTypes.byId(booking.eventTypeId), booking)
     const host = await repos.users.byId(booking.hostUserId)
     if (!host) return manageError(c, 'This booking is no longer available.')
 
@@ -3317,7 +3328,7 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
     }
 
     const repos = ports.repositories(guestScope())
-    const eventType = await repos.eventTypes.byId(old.eventTypeId)
+    const eventType = forBooking(await repos.eventTypes.byId(old.eventTypeId), old)
     const host = await repos.users.byId(old.hostUserId)
     if (!eventType || !host) return manageError(c, 'This booking can no longer be moved.')
 
@@ -3649,7 +3660,7 @@ function readWeeklyDraftFromForm(form: FormData): WeeklyDayDraft[] {
 function readEventTypeForm(
   form: FormData,
   ownerUserId: string,
-): { draft: EventType; questionsText: string } {
+): { draft: EventType; questionsText: string; optionsText: EventTypeOptionsText } {
   const text = (name: string): string => String(form.get(name) ?? '').trim()
   const int = (name: string, fallback: number): number => {
     const raw = text(name)
@@ -3664,6 +3675,11 @@ function readEventTypeForm(
 
   const title = text('title')
   const questionsText = String(form.get('questions') ?? '')
+  const optionsText: EventTypeOptionsText = {
+    durations: text('durationOptions'),
+    locations: String(form.get('locationOptions') ?? ''),
+  }
+  const parsedLocations = parseLocationOptions(optionsText.locations)
   // Exactly one owner is ever set. The scheduling select is always rendered
   // (no JS hides it), so its value is IGNORED for a personal event — the
   // server forces 'personal', and a crafted round_robin on owner=me cannot
@@ -3689,6 +3705,10 @@ function readEventTypeForm(
     maxPerDay: optionalInt('maxPerDay'),
     locationType: locationTypeOf(text('locationType')),
     locationValue: text('locationValue') || null,
+    // Unparseable text leaves these empty here; validateEventType reports
+    // it, and the form refills from `optionsText`, not from these.
+    durationOptions: parseDurationOptions(optionsText.durations) ?? [],
+    locationOptions: 'options' in parsedLocations ? parsedLocations.options : [],
     questions: parseQuestions(questionsText) ?? [],
     active: form.get('active') !== null,
     createdAt: 0,
@@ -3697,7 +3717,41 @@ function readEventTypeForm(
     // its value is ignored here regardless of what was submitted.
     scheduleId: ownerTeamId === null ? text('scheduleId') || null : null,
   }
-  return { draft, questionsText }
+  return { draft, questionsText, optionsText }
+}
+
+/**
+ * The guest-choice fields (other durations, more locations) as typed, so a
+ * form that failed validation refills with the host's text, not a re-format
+ * of whatever parsed.
+ */
+export interface EventTypeOptionsText {
+  durations: string
+  locations: string
+}
+
+/** Field errors for the guest-choice fields (core/domain/booking-options.ts). */
+function validateEventTypeOptions(draft: EventType, text: EventTypeOptionsText): Record<string, string> {
+  const errors: Record<string, string> = {}
+  const durations = parseDurationOptions(text.durations)
+  if (durations === null) {
+    errors['durationOptions'] = 'Whole minutes, separated by commas, e.g. 45, 60'
+  } else if (durations.some((d) => d < 5 || d > 1440 || d % 5 !== 0)) {
+    errors['durationOptions'] = 'Each between 5 and 1440 minutes, in steps of 5'
+  } else if (durations.length > MAX_DURATION_OPTIONS) {
+    errors['durationOptions'] = `Up to ${MAX_DURATION_OPTIONS} other durations`
+  }
+  const locations = parseLocationOptions(text.locations)
+  if ('error' in locations) errors['locationOptions'] = locations.error
+  else if (locations.options.length > MAX_LOCATION_OPTIONS) {
+    errors['locationOptions'] = `Up to ${MAX_LOCATION_OPTIONS} more locations`
+  } else if (locations.options.some((o) => o.type === 'custom_link' && o.value !== null && !isHttpUrl(o.value))) {
+    errors['locationOptions'] = 'A custom link must be a full http(s) URL'
+  }
+  if (draft.locationType === 'custom_link' && !draft.locationValue && (draft.locationOptions ?? []).length > 0) {
+    errors['locationValue'] = 'Give the custom link its URL'
+  }
+  return errors
 }
 
 /** Absolute http(s) only — the one place this is checked before a value can reach a public page's href. */
@@ -3734,8 +3788,9 @@ async function validateEventType(
   draft: EventType,
   questionsText: string,
   currentId: string | null,
+  optionsText: EventTypeOptionsText = { durations: '', locations: '' },
 ): Promise<Record<string, string>> {
-  const errors: Record<string, string> = {}
+  const errors: Record<string, string> = validateEventTypeOptions(draft, optionsText)
 
   if (draft.title === '' || draft.title.length > 120) errors['title'] = 'Give it a title (up to 120 characters)'
 

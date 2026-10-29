@@ -24,6 +24,7 @@ import type { WebhookEvent,
   EventType,
   EventTypeHost,
   Interval,
+  LocationOption,
   MagicLinkToken,
   Schedule,
   Session,
@@ -827,6 +828,13 @@ export interface BookingAttempt {
   idempotencyKey?: string
   holdId?: string
   rescheduleOf?: string
+  /**
+   * The location the guest picked, when the event type offers more than one
+   * (core/domain/booking-options.ts). For an option the guest fills in,
+   * `value` is what they typed. Absent: the default, or on a reschedule the
+   * original booking's choice.
+   */
+  location?: LocationOption
 }
 
 export type BookingOutcome =

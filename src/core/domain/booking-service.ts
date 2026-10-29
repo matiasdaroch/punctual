@@ -21,6 +21,7 @@ import type {
   EventType,
   EventTypeQuestion,
   Interval,
+  LocationOption,
   TeamMember,
 } from './types.js'
 import type { BucketClaim } from '../../ports.js'
@@ -51,6 +52,8 @@ export interface BookingRequest {
   bookingId: string
   manageTokenHash: string
   rescheduleOf?: string | null
+  /** The guest's chosen location, stored on the booking; null = the event type's. */
+  location?: LocationOption | null
   /** Round-robin ordering input: teamId + last-assigned times. */
   rrContext?: { teamId: string; members: TeamMember[]; lastAssignedAt: Map<string, number> }
 }
@@ -220,6 +223,8 @@ export function prepareBooking(req: BookingRequest): BookingResult {
     externalEventIds: {},
     // Filled by the calendar sync once a provider mints one.
     conferenceUrl: null,
+    locationType: req.location?.type ?? null,
+    locationValue: req.location ? req.location.value : null,
     rescheduleOf: req.rescheduleOf ?? null,
     rescheduledTo: null,
     manageTokenHash: req.manageTokenHash,

@@ -376,14 +376,15 @@ export function createD1Repositories(db: D1Database, scope: RequestScope): Repos
          (id,owner_user_id,owner_team_id,scheduling_type,slug,title,description,duration_minutes,
           slot_interval_minutes,buffer_before_minutes,buffer_after_minutes,min_notice_minutes,
           max_horizon_days,max_per_day,location_type,location_value,questions_json,active,created_at,
-          schedule_id,logo_key)
+          schedule_id,logo_key,duration_options_json,location_options_json)
          VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,
-           (SELECT id FROM schedules WHERE id = ?),?)`,
+           (SELECT id FROM schedules WHERE id = ?),?,?,?)`,
         row.id, row.ownerUserId, row.ownerTeamId, row.schedulingType, row.slug, row.title,
         row.description, row.durationMinutes, row.slotIntervalMinutes, row.bufferBeforeMinutes,
         row.bufferAfterMinutes, row.minNoticeMinutes, row.maxHorizonDays, row.maxPerDay,
         row.locationType, row.locationValue, JSON.stringify(row.questions), row.active ? 1 : 0,
         row.createdAt, row.scheduleId, row.logoKey ?? null,
+        JSON.stringify(row.durationOptions ?? []), JSON.stringify(row.locationOptions ?? []),
       )
       // Re-read schedule_id rather than echo the input (caught by review):
       // the subquery above can resolve to NULL when the caller's own
@@ -429,6 +430,8 @@ export function createD1Repositories(db: D1Database, scope: RequestScope): Repos
       if (patch.locationType !== undefined) put('location_type', patch.locationType)
       if (patch.locationValue !== undefined) put('location_value', patch.locationValue)
       if (patch.questions !== undefined) put('questions_json', JSON.stringify(patch.questions))
+      if (patch.durationOptions !== undefined) put('duration_options_json', JSON.stringify(patch.durationOptions))
+      if (patch.locationOptions !== undefined) put('location_options_json', JSON.stringify(patch.locationOptions))
       if (patch.active !== undefined) put('active', patch.active ? 1 : 0)
       if (patch.logoKey !== undefined) put('logo_key', patch.logoKey)
       if (patch.logoShape !== undefined) put('logo_shape', patch.logoShape)
@@ -737,8 +740,8 @@ export function createD1Repositories(db: D1Database, scope: RequestScope): Repos
             `INSERT INTO bookings
              (id,event_type_id,host_user_id,host_user_ids_json,guest_name,guest_email,guest_timezone,
               start_utc,end_utc,local_date,status,answers_json,external_event_ids_json,reschedule_of,
-              rescheduled_to,manage_token_hash,cancelled_at,created_at)
-             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+              rescheduled_to,manage_token_hash,cancelled_at,created_at,location_type,location_value)
+             VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
           )
           .bind(
             booking.id, booking.eventTypeId, booking.hostUserId,
@@ -746,7 +749,7 @@ export function createD1Repositories(db: D1Database, scope: RequestScope): Repos
             booking.guestTimezone, booking.startUtc, booking.endUtc, booking.localDate, booking.status,
             JSON.stringify(booking.answers), JSON.stringify(booking.externalEventIds),
             booking.rescheduleOf, booking.rescheduledTo, booking.manageTokenHash,
-            booking.cancelledAt, booking.createdAt,
+            booking.cancelledAt, booking.createdAt, booking.locationType ?? null, booking.locationValue ?? null,
           ),
       ]
 
@@ -1726,6 +1729,8 @@ function mapEventType(row: Record<string, unknown> | null): EventType | null {
     maxPerDay: row['max_per_day'] == null ? null : Number(row['max_per_day']),
     locationType: String(row['location_type']) as EventType['locationType'],
     locationValue: row['location_value'] == null ? null : String(row['location_value']),
+    durationOptions: JSON.parse(String(row['duration_options_json'] ?? '[]')),
+    locationOptions: JSON.parse(String(row['location_options_json'] ?? '[]')),
     questions: JSON.parse(String(row['questions_json'] ?? '[]')),
     active: Number(row['active']) === 1,
     createdAt: Number(row['created_at']),
@@ -1752,6 +1757,8 @@ function mapBooking(row: Record<string, unknown> | null): Booking | null {
     answers: JSON.parse(String(row['answers_json'] ?? '{}')),
     externalEventIds: JSON.parse(String(row['external_event_ids_json'] ?? '{}')),
     conferenceUrl: row['conference_url'] == null ? null : String(row['conference_url']),
+    locationType: row['location_type'] == null ? null : (String(row['location_type']) as Booking['locationType']),
+    locationValue: row['location_value'] == null ? null : String(row['location_value']),
     rescheduleOf: row['reschedule_of'] == null ? null : String(row['reschedule_of']),
     rescheduledTo: row['rescheduled_to'] == null ? null : String(row['rescheduled_to']),
     manageTokenHash: String(row['manage_token_hash']),
