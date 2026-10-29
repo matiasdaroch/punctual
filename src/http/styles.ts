@@ -353,7 +353,7 @@ time,.pu-time{font-family:var(--pu-font-mono);font-variant-numeric:tabular-nums}
   text-decoration:none;color:var(--pu-text-primary)}
 .pu-mark span{color:var(--pu-signal)}
 .pu-mark-logo{display:inline-block;line-height:0}
-.pu-mark-logo img{height:40px;width:auto}
+.pu-mark-logo img{height:56px;width:auto}
 .pu-logo-dark{display:none}
 @media (prefers-color-scheme:dark){:root:not([data-theme=light]) .pu-logo-light{display:none}:root:not([data-theme=light]) .pu-logo-dark{display:inline}}
 :root[data-theme=dark] .pu-logo-light{display:none}

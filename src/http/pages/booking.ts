@@ -788,7 +788,7 @@ export function shiftMonth(month: string, delta: number): string {
 export function brandLogoHtml(href: string, brandName: string, extraStyle = ''): string {
   const alt = escapeHtml(brandName)
   return `<a class="pu-mark pu-mark-logo" href="${escapeHtml(href)}"${extraStyle ? ` style="${extraStyle}"` : ''}>` +
-    `<img class="pu-logo-light" src="/brand/mik/logo-light.svg" alt="${alt}" width="75" height="40">` +
-    `<img class="pu-logo-dark" src="/brand/mik/logo-white.svg" alt="" aria-hidden="true" width="75" height="40">` +
+    `<img class="pu-logo-light" src="/brand/mik/logo-light.svg" alt="${alt}" width="106" height="56">` +
+    `<img class="pu-logo-dark" src="/brand/mik/logo-white.svg" alt="" aria-hidden="true" width="106" height="56">` +
     `</a>`
 }
