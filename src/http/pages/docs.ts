@@ -41,6 +41,7 @@ interface DocsNavItem {
  */
 const DOCS_NAV: DocsNavItem[] = [
   { path: '/docs', label: 'Overview' },
+  { path: '/docs/links', label: 'Booking links' },
   { path: '/docs/self-hosting', label: 'Self-hosting' },
   { path: '/docs/api', label: 'REST API' },
   { path: '/docs/mcp', label: 'MCP server' },
@@ -612,5 +613,86 @@ export function docsMcpPage(opts: DocsPageOptions): string {
     'MCP server',
     'A Model Context Protocol server exposing five scheduling tools to AI agents, scoped to the calling API key.',
     mcpContent(opts),
+  )
+}
+
+// ---------------------------------------------------------------------------
+// /docs/links
+// ---------------------------------------------------------------------------
+
+function linksContent(opts: DocsPageOptions): string {
+  const base = opts.baseUrl.replace(/\/$/, '')
+  const row = (name: string, what: string, example: string) =>
+    `<tr><td class="pu-time">${escapeHtml(name)}</td><td>${what}</td><td class="pu-time">${escapeHtml(example)}</td></tr>`
+  return `
+<p>Every booking link can carry what you already know about the meeting, so
+  the guest lands on the right length and place with their details filled
+  in. Everything a link prefills stays editable, and a value the event does
+  not offer is ignored rather than shown as an error.</p>
+
+<h2>Your links</h2>
+<div class="pu-docs-table-wrap"><table>
+<thead><tr><th scope="col">Link</th><th scope="col">Opens</th></tr></thead>
+<tbody>
+<tr><td class="pu-time">${escapeHtml(base)}/matias</td><td>Your main link: the event you ticked as
+  <em>Make this my main link</em>, or your only active event.</td></tr>
+<tr><td class="pu-time">${escapeHtml(base)}/matias/site-visit</td><td>One event, by its slug.</td></tr>
+</tbody>
+</table></div>
+
+<h2>Length and place</h2>
+<div class="pu-docs-table-wrap"><table>
+<thead><tr><th scope="col">Parameter</th><th scope="col">Picks</th><th scope="col">Example</th></tr></thead>
+<tbody>
+${row('duration', 'One of the event\'s lengths, in minutes.', '?duration=60')}
+${row('location', 'A place by kind: <code>meet</code>, <code>phone</code>, <code>in-person</code> or <code>link</code> (the first of that kind), or by its position in the event\'s list.', '?location=phone  ·  ?location=2')}
+</tbody>
+</table></div>
+
+<h2>Guest details</h2>
+<div class="pu-docs-table-wrap"><table>
+<thead><tr><th scope="col">Parameter</th><th scope="col">Fills</th><th scope="col">Example</th></tr></thead>
+<tbody>
+${row('name', 'Their name.', '?name=Ana%20Lopez')}
+${row('first_name, last_name', 'Their name, joined with a space (when <code>name</code> is not given). <code>firstname</code> and <code>lastname</code> work too.', '?first_name=Ana&last_name=Lopez')}
+${row('email', 'Their email.', '?email=ana@example.com')}
+${row('guests', 'People to invite along, on an event that allows guests. Commas between addresses.', '?guests=a@x.com,b@y.com')}
+${row('&lt;question id&gt;', 'The answer to one of the event\'s questions (see below).', '?phone=%2B17867080880')}
+</tbody>
+</table></div>
+
+<h3>Question ids</h3>
+<p>A question's id is its label in lowercase, with anything that is not a
+  letter or a number turned into a hyphen: <code>Phone</code> is
+  <code>phone</code>, <code>Property address</code> is
+  <code>property-address</code>, <code>Project type</code> is
+  <code>project-type</code>. The built-in "What would you like to discuss?"
+  is <code>agenda</code>. A dropdown takes one of its choices, spelled
+  exactly as listed.</p>
+
+<h3>Phone numbers</h3>
+<p>Write the plus sign as <code>%2B</code>, since a bare <code>+</code> in a link
+  reads as a space: <code>?phone=%2B17867080880</code> opens on United States
+  +1 with 786 708 0880. A number without a country code
+  (<code>?phone=7867080880</code>) keeps the form's default country.</p>
+
+<h2>Putting it together</h2>
+<p>Parameters join with <code>&amp;</code>, and spaces are written
+  <code>%20</code>:</p>
+${pre(`${base}/matias?duration=60&location=phone&first_name=Ana&last_name=Lopez&email=ana@example.com&phone=%2B17867080880&project-type=New%20home`)}
+<p class="pu-muted">Building links in a sheet or in n8n: encode each value
+  (Google Sheets <code>ENCODEURL()</code>, or n8n's
+  <code>encodeURIComponent()</code>) so spaces, plus signs and ampersands
+  arrive intact.</p>
+`
+}
+
+export function docsLinksPage(opts: DocsPageOptions): string {
+  return docsPage(
+    opts,
+    '/docs/links',
+    'Booking links',
+    'Short links, and how to prefill the length, the place and the guest\'s details when you send one.',
+    linksContent(opts),
   )
 }

@@ -141,3 +141,42 @@ describe('a person\'s bare address', () => {
     expect((await fetchPage('/nobody-has-this')).status).toBe(404)
   })
 })
+
+describe('prefilled links', () => {
+  const start = Date.UTC(2031, 0, 15, 15, 0)
+
+  it('fills the confirm form from the link, the phone on its country', async () => {
+    const html = await (
+      await fetchPage(`/phone-host/with-question/confirm?start=${start}&tz=UTC&first_name=Ana&last_name=Lopez&email=ana%40example.com&phone=%2B573001234567`)
+    ).text()
+    expect(html).toMatch(/<input id="name" name="name"[^>]*\n?\s*value="Ana Lopez"/)
+    expect(html).toMatch(/<input id="email" name="email"[^>]*\n?\s*value="ana@example.com"/)
+    expect(html).toContain('<option value="CO" selected>Colombia +57</option>')
+    expect(html).toContain('value="3001234567"')
+  })
+
+  it('carries the details from the booking page onward, and nothing else', async () => {
+    const html = await (await fetchPage('/phone-host/with-question?date=2031-01-15&tz=UTC&name=Ana&utm_source=x')).text()
+    // The timezone form re-posts the page with them; day and time links append the same pairs.
+    expect(html).toContain('<input type="hidden" name="name" value="Ana">')
+    expect(html).not.toContain('name="utm_source"')
+  })
+})
+
+describe('trailing slashes', () => {
+  it('sends /name/ to /name, query and all', async () => {
+    const res = await fetchPage('/phone-host/?duration=45')
+    expect(res.status).toBe(301)
+    expect(res.headers.get('location')).toBe('/phone-host?duration=45')
+  })
+})
+
+describe('docs', () => {
+  it('documents prefilled links', async () => {
+    const res = await fetchPage('/docs/links')
+    expect(res.status).toBe(200)
+    const html = await res.text()
+    expect(html).toContain('first_name, last_name')
+    expect(html).toContain('%2B17867080880')
+  })
+})

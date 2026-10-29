@@ -25,7 +25,7 @@ import { instanceHomePage } from './pages/home.js'
 import { HOME_KEYS, homeFeatured, homeGroups, homeItems, parseHomeSettings, withTeamPeople } from '../core/domain/home.js'
 import { COMPANY_LOGO_KEY, COMPANY_LOGO_SHAPE, companyLogoFrom } from '../core/domain/media.js'
 import { insightEventFor, isLikelyBot, refererHost, type InsightKind } from '../core/domain/insights.js'
-import { docsApiPage, docsIndexPage, docsMcpPage, docsSelfHostingPage } from './pages/docs.js'
+import { docsApiPage, docsIndexPage, docsLinksPage, docsMcpPage, docsSelfHostingPage } from './pages/docs.js'
 import type { EnginePorts, Repositories, RequestScope } from '../ports.js'
 import type { SlotService } from '../engine.js'
 import { daysWithSlots, monthRange } from '../engine.js'
@@ -42,6 +42,7 @@ import {
 } from '../core/domain/booking-options.js'
 import { describeLocation } from '../core/ics.js'
 import { isValidPhone, joinPhone } from '../core/domain/phone.js'
+import { prefillValues, readPrefill } from '../core/domain/prefill.js'
 import { hostUsers as hostUsers_, resolveHosts as resolveEventTypeHosts } from '../core/domain/hosts.js'
 import { isValidTimeZone, localDateString } from '../core/time/zone.js'
 import {
@@ -193,6 +194,16 @@ export function buildRouter(ports: EnginePorts, slots: SlotService): Hono<{ Bind
       }),
     ),
   )
+  app.get('/docs/links', (c) =>
+    c.html(
+      docsLinksPage({
+        brandName: ports.config.brandName,
+        baseUrl: ports.config.baseUrl,
+        ...(ports.config.legalOperator ? { operator: ports.config.legalOperator } : {}),
+        ...(ports.config.analyticsId ? { analyticsId: ports.config.analyticsId } : {}),
+      }),
+    ),
+  )
   app.get('/docs/mcp', (c) =>
     c.html(
       docsMcpPage({
@@ -333,7 +344,7 @@ export function buildRouter(ports: EnginePorts, slots: SlotService): Hono<{ Bind
     // The guest's length (?duration=) shapes which times exist, so it is
     // applied before anything reads the event type; ?location= only
     // preselects the confirm form (core/domain/booking-options.ts).
-    const choice = readChoice(ctx.eventType, c.req.query('duration'), c.req.query('location'))
+    const choice = readChoice(ctx.eventType, c.req.query('duration'), c.req.query('location'), (name) => c.req.query(name))
     const eventType = choice.eventType
 
     const guestTimezone = resolveGuestTimezone(c.req.query('tz'), c.req.raw, host.tz)
@@ -487,7 +498,7 @@ export function buildRouter(ports: EnginePorts, slots: SlotService): Hono<{ Bind
     const ctx = await repos.eventTypes.bookingPageContext(userSlug, eventSlug)
     if (!ctx) return notFound(c, ports)
     const { host, team, companyLogo } = ctx
-    const choice = readChoice(ctx.eventType, c.req.query('duration'), c.req.query('location'))
+    const choice = readChoice(ctx.eventType, c.req.query('duration'), c.req.query('location'), (name) => c.req.query(name))
     const eventType = choice.eventType
 
     const start = Number(c.req.query('start'))
@@ -517,7 +528,7 @@ export function buildRouter(ports: EnginePorts, slots: SlotService): Hono<{ Bind
       shellHead({ title: `Confirm · ${eventType.title}`, brandName: ports.config.brandName }) +
       eventHeader(data) +
       hostsRow(data) +
-      confirmForm(data, start) +
+      confirmForm(data, start, { values: prefillValues(ctx.eventType, choice.pageFields.prefill ?? {}) }) +
       shellFoot(true, embed, displayCompany(data))
     return c.html(html)
   })
@@ -719,7 +730,15 @@ export function buildRouter(ports: EnginePorts, slots: SlotService): Hono<{ Bind
     return c.redirect(`/${encodeURIComponent(user.slug)}/${encodeURIComponent(target.slug)}${query}`, 302)
   })
 
-  app.notFound((c) => notFound(c, ports))
+  // /matias/ is /matias: an address with a trailing slash goes to the one
+  // without, query string and all, rather than to "not found".
+  app.notFound((c) => {
+    const url = new URL(c.req.url)
+    if (c.req.method === 'GET' && url.pathname.length > 1 && url.pathname.endsWith('/')) {
+      return c.redirect(`${url.pathname.replace(/\/+$/, '')}${url.search}`, 301)
+    }
+    return notFound(c, ports)
+  })
 
   return app
 }
@@ -737,14 +756,21 @@ function readChoice(
   base: EventType,
   rawDuration: string | null | undefined,
   rawLocation: string | null | undefined,
-): { eventType: EventType; pageFields: { duration?: number; location?: number | null } } {
+  query?: (name: string) => string | undefined,
+): {
+  eventType: EventType
+  pageFields: { duration?: number; location?: number | null; prefill?: Record<string, string> }
+} {
   const minutes = pickDuration(base, rawDuration)
   const location = pickLocation(base, rawLocation)
+  // Guest details from the link (core/domain/prefill.ts), to carry along.
+  const prefill = query ? readPrefill(base, query) : {}
   return {
     eventType: withDuration(base, minutes),
     pageFields: {
       ...(durationChoices(base).length > 1 ? { duration: minutes } : {}),
       ...(location !== null ? { location } : {}),
+      ...(Object.keys(prefill).length > 0 ? { prefill } : {}),
     },
   }
 }

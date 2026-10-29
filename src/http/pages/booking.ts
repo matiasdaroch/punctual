@@ -225,6 +225,12 @@ export interface BookingPageData {
    * `locationChoices`; the confirm form preselects it. Propagated like `duration`.
    */
   location?: number | null
+  /**
+   * Guest details a link prefilled (core/domain/prefill.ts): kept as the
+   * link gave them and propagated like `duration`, so the confirm form opens
+   * filled in however many days and times the guest clicks through first.
+   */
+  prefill?: Record<string, string>
 }
 
 /**
@@ -496,10 +502,13 @@ export function phoneQuestionOf(et: EventType): EventTypeQuestion | undefined {
 }
 
 /** `&duration=…&location=…` for the guest's choices, appended to every internal link. */
-export function choiceQuery(d: Pick<BookingPageData, 'duration' | 'location'>): string {
+export function choiceQuery(d: Pick<BookingPageData, 'duration' | 'location' | 'prefill'>): string {
   return (
     (d.duration !== undefined ? `&duration=${d.duration}` : '') +
-    (d.location !== undefined && d.location !== null ? `&location=${d.location + 1}` : '')
+    (d.location !== undefined && d.location !== null ? `&location=${d.location + 1}` : '') +
+    Object.entries(d.prefill ?? {})
+      .map(([k, v]) => `&${encodeURIComponent(k)}=${encodeURIComponent(v)}`)
+      .join('')
   )
 }
 
@@ -509,7 +518,10 @@ function choiceHiddenFields(d: BookingPageData): string {
     (d.duration !== undefined ? `<input type="hidden" name="duration" value="${d.duration}">` : '') +
     (d.location !== undefined && d.location !== null
       ? `<input type="hidden" name="location" value="${d.location + 1}">`
-      : '')
+      : '') +
+    Object.entries(d.prefill ?? {})
+      .map(([k, v]) => `<input type="hidden" name="${escapeHtml(k)}" value="${escapeHtml(v)}">`)
+      .join('')
   )
 }
 

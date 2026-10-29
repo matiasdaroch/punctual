@@ -112,3 +112,21 @@ export function isValidPhone(value: string): boolean {
   const digits = value.replace(/\D/g, '').length
   return digits >= 6 && digits <= 15
 }
+
+/**
+ * A number from a link (`?phone=…`) into the stored `+<code> <number>` form,
+ * so the form opens on the right country. In a URL an unencoded `+` arrives
+ * as a space, so a leading space before digits is read as the `+` it was.
+ * Without one, the number is national and the country stays the default.
+ */
+export function phoneFromLink(raw: string): string {
+  const leadingPlus = raw.startsWith('+') || /^\s+\d/.test(raw)
+  const value = raw.trim().replace(/^\+/, '')
+  if (!leadingPlus) return value
+  if (/^\d{1,4}\s/.test(value)) return `+${value}`
+  const digits = value.replace(/\D/g, '')
+  // The longest calling code that starts the digits; the US first for +1.
+  const codes = [...new Set(CALLING_CODES.map((c) => c.code))].sort((a, b) => b.length - a.length)
+  const code = codes.find((c) => digits.startsWith(c))
+  return code ? `+${code} ${digits.slice(code.length)}` : `+${value}`
+}
