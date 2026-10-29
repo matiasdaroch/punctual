@@ -83,8 +83,9 @@ export function shellHead(chrome: PageChrome): string {
 <title>${escapeHtml(chrome.title)}</title>
 ${chrome.description ? `<meta name="description" content="${escapeHtml(chrome.description)}">` : ''}
 <meta name="color-scheme" content="light dark">
-<meta name="theme-color" content="${chrome.themeColor ?? '#0E7C4C'}">
-<link rel="icon" href="/favicon.svg" type="image/svg+xml">
+<meta name="theme-color" content="${chrome.themeColor ?? '#038C7F'}">
+<link rel="icon" href="/brand/mik/favicon.png" type="image/png">
+<link rel="apple-touch-icon" href="/brand/mik/favicon.png">
 ${
   chrome.canonical
     ? `<link rel="canonical" href="${escapeHtml(chrome.canonical)}">`
@@ -110,8 +111,8 @@ ${chrome.description ? `<meta name="twitter:description" content="${escapeHtml(c
      the first paint is final, so a face that isn't preloaded is a face the
      visitor likely never sees on a cold cache. Inter carries all body text —
      leaving it out is what made whole pages repaint mid-view. -->
-<link rel="preload" href="/fonts/inter-variable.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="/fonts/schibstedgrotesk-600.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/mulish-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="preload" href="/fonts/catamaran-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/fonts/ibmplexmono-400.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/fonts/ibmplexmono-600.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/fonts/ibmplexmono-700.woff2" as="font" type="font/woff2" crossorigin>
@@ -146,10 +147,7 @@ export function shellFoot(poweredBy = true, embed = false, operator?: string | n
   // and go blank, or strand the guest on punctual.sh with no way back into
   // the booking flow. A new tab is correct whether embedded or not — this
   // link now leaves the deployment entirely.
-  const mark = `<a class="pu-mark" href="${PUNCTUAL_SITE_URL}" target="_blank" rel="noopener">punctual<span>:</span></a>`
-  const foot = operator
-    ? `<p class="pu-foot">${escapeHtml(operator)} · scheduling by ${mark}</p>`
-    : `<p class="pu-foot">${mark} — scheduling that shows up on time</p>`
+  const foot = operator ? `<p class="pu-foot">${escapeHtml(operator)}</p>` : ''
   return `</div>
 ${poweredBy ? foot : ''}
 ${embed ? embedResizeScriptTag() : ''}
@@ -780,4 +778,17 @@ export function shiftMonth(month: string, delta: number): string {
   const [y, m] = month.split('-').map(Number) as [number, number]
   const d = new Date(Date.UTC(y, m - 1 + delta, 1))
   return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}`
+}
+
+/**
+ * The brand lockup (assets/brand/mik), in place of the text wordmark: the
+ * light-ground version, swapped for the white one on a dark theme by
+ * `.pu-logo-light` / `.pu-logo-dark` in styles.ts.
+ */
+export function brandLogoHtml(href: string, brandName: string, extraStyle = ''): string {
+  const alt = escapeHtml(brandName)
+  return `<a class="pu-mark pu-mark-logo" href="${escapeHtml(href)}"${extraStyle ? ` style="${extraStyle}"` : ''}>` +
+    `<img class="pu-logo-light" src="/brand/mik/logo-light.svg" alt="${alt}" width="75" height="40">` +
+    `<img class="pu-logo-dark" src="/brand/mik/logo-white.svg" alt="" aria-hidden="true" width="75" height="40">` +
+    `</a>`
 }

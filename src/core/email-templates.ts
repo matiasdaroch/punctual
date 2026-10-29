@@ -71,16 +71,16 @@ export interface BookingEmailContext {
 
 // Brand palette. Inline hex rather than tokens: email has no cascade and no
 // custom properties, so every colour has to travel with the element.
-const INK = '#0F1512'
-const MUTED = '#5C6660'
-const PAPER = '#FAFAF7'
-const PAPER_DIM = '#F0F1EC'
-const LINE = '#E3E5DE'
-const MERIDIAN = '#0E7C4C'
+const INK = '#221F1F'
+const MUTED = '#3F413E'
+const PAPER = '#F7F5F1'
+const PAPER_DIM = '#EEEBE5'
+const LINE = '#E0DCD4'
+const MERIDIAN = '#46736E'
 const DANGER = '#D92D20'
 
-const FONT = "-apple-system,BlinkMacSystemFont,'Segoe UI',Inter,Helvetica,Arial,sans-serif"
-const MONO = "ui-monospace,SFMono-Regular,Menlo,'IBM Plex Mono',monospace"
+const FONT = "Mulish,'Trebuchet MS',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+const DISPLAY = "Catamaran,'Trebuchet MS',-apple-system,BlinkMacSystemFont,Helvetica,Arial,sans-serif"
 
 // ---------------------------------------------------------------------------
 // Escaping
@@ -214,8 +214,8 @@ function ctaHtml(cta: Cta, accent: string): string {
   // on a <td> is not.
   return (
     `<table role="presentation" cellpadding="0" cellspacing="0" border="0" style="margin:0 0 16px 0;">` +
-    `<tr><td bgcolor="${accent}" style="border-radius:10px;">` +
-    `<a href="${escapeHtml(href)}" style="display:inline-block;padding:12px 22px;font-family:${FONT};font-size:15px;font-weight:600;color:#FFFFFF;text-decoration:none;border-radius:10px;">${escapeHtml(cta.label)}</a>` +
+    `<tr><td bgcolor="${accent}" style="border-radius:2px;">` +
+    `<a href="${escapeHtml(href)}" style="display:inline-block;padding:12px 22px;font-family:${FONT};font-size:15px;font-weight:600;color:#FFFFFF;text-decoration:none;border-radius:2px;">${escapeHtml(cta.label)}</a>` +
     `</td></tr></table>`
   )
 }
@@ -252,11 +252,11 @@ function shell(input: ShellInput): string {
     `<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(input.preheader)}</div>` +
     `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${PAPER};margin:0;padding:0;">` +
     `<tr><td align="center" style="padding:24px 12px;">` +
-    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="width:100%;max-width:600px;background-color:#FFFFFF;border:1px solid ${LINE};border-radius:16px;">` +
+    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="width:100%;max-width:600px;background-color:#FFFFFF;border:1px solid ${LINE};border-radius:2px;">` +
     // Wordmark as text, not an image: images are blocked by default in Outlook
     // and Gmail, and a confirmation must not open on a broken placeholder.
-    `<tr><td style="padding:24px 28px 8px 28px;font-family:${MONO};font-size:16px;font-weight:600;letter-spacing:-0.02em;color:${INK};">` +
-    `${escapeHtml(input.brandName.toLowerCase())}<span style="color:${accent};">:</span>` +
+    `<tr><td style="padding:24px 28px 8px 28px;color:${INK};">` +
+    brandLockup(input.brandName) +
     `</td></tr>` +
     // The host photo, unlike the wordmark above: optional, decorative, an
     // <img> with real alt text. If it fails to load the row still reserves
@@ -268,10 +268,10 @@ function shell(input: ShellInput): string {
         `style="width:40px;height:40px;border-radius:50%;display:block;object-fit:cover;">` +
         `</td></tr>`
       : '') +
-    `<tr><td style="padding:8px 28px 0 28px;font-family:${FONT};font-size:22px;line-height:30px;font-weight:700;color:${INK};">${escapeHtml(input.heading)}</td></tr>` +
+    `<tr><td style="padding:8px 28px 0 28px;font-family:${DISPLAY};font-size:24px;line-height:30px;font-weight:600;color:${INK};">${escapeHtml(input.heading)}</td></tr>` +
     `<tr><td style="padding:12px 28px 0 28px;font-family:${FONT};font-size:15px;line-height:23px;color:${INK};">${escapeHtml(input.intro)}</td></tr>` +
     `<tr><td style="padding:20px 28px 0 28px;">` +
-    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;background-color:${PAPER_DIM};border-radius:10px;">` +
+    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;background-color:${PAPER_DIM};border-radius:2px;">` +
     `<tr><td style="padding:16px 18px;">` +
     `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="100%" style="width:100%;">${rows}</table>` +
     `</td></tr></table></td></tr>` +
@@ -777,4 +777,20 @@ export function dailyDigestEmail(input: DigestEmailInput): EmailContent {
     ],
   }
   return render(shellInput, `Today: ${n} ${n === 1 ? 'meeting' : 'meetings'} — ${dayLabel}`)
+}
+
+/**
+ * The brand's text-only lockup, built in type rather than as an image so it
+ * survives image blocking: the first word in Mulish Bold, the rest in
+ * Catamaran Regular, uppercase, ARCHITECTURE 0.5pt larger so the cap
+ * heights meet (MIK Architecture design system, Logo).
+ */
+function brandLockup(brandName: string): string {
+  const [first = brandName, ...rest] = brandName.trim().split(/\s+/)
+  return (
+    `<span style="font-family:${FONT};font-size:15px;font-weight:700;letter-spacing:0.02em;color:${INK};">${escapeHtml(first.toUpperCase())}</span>` +
+    (rest.length > 0
+      ? ` <span style="font-family:${DISPLAY};font-size:15.5px;font-weight:400;letter-spacing:0.08em;color:${INK};">${escapeHtml(rest.join(' ').toUpperCase())}</span>`
+      : '')
+  )
 }

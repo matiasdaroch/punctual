@@ -210,9 +210,9 @@ describe('email-client safety', () => {
 
   it('paints the brand colours', () => {
     const html = bookingConfirmationForGuest(ctx()).html
-    expect(html).toContain('#0E7C4C') // meridian green CTA
-    expect(html).toContain('#FAFAF7') // paper
-    expect(html).toContain('#0F1512') // ink
+    expect(html).toContain('#46736E') // mik-green-dark CTA
+    expect(html).toContain('#F7F5F1') // paper
+    expect(html).toContain('#221F1F') // mik-black ink
   })
 
   it('declares an explicit charset, so an en dash never turns to mojibake', () => {

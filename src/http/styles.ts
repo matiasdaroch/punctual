@@ -30,6 +30,15 @@
  * weights riding along unused.
  */
 export const FONT_FACES = `
+@font-face{font-family:"Catamaran";font-style:normal;font-weight:100 900;font-display:optional;
+  src:url(/fonts/catamaran-latin-wght-normal.woff2) format("woff2");
+  unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"Mulish";font-style:normal;font-weight:200 1000;font-display:optional;
+  src:url(/fonts/mulish-latin-wght-normal.woff2) format("woff2");
+  unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+@font-face{font-family:"Mulish";font-style:italic;font-weight:200 1000;font-display:optional;
+  src:url(/fonts/mulish-latin-wght-italic.woff2) format("woff2");
+  unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
 @font-face{font-family:"IBM Plex Mono";font-style:normal;font-weight:400;font-display:optional;
   src:url(/fonts/ibmplexmono-400.woff2) format("woff2");
   unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
@@ -49,10 +58,10 @@ export const FONT_FACES = `
 
 export const TOKENS = `
 :root{
-  --pu-ink-950:#0F1512; --pu-ink-900:#17201B; --pu-ink-700:#2E3B34;
-  --pu-ink-500:#5C6660; --pu-paper:#FAFAF7; --pu-paper-dim:#F0F1EC;
-  --pu-line:#E3E5DE; --pu-green-700:#0E7C4C; --pu-green-800:#0A5C3A;
-  --pu-signal:#1FC16B; --pu-green-tint:#E4F5EC; --pu-danger:#D92D20;
+  --pu-ink-950:#221F1F; --pu-ink-900:#2C2929; --pu-ink-700:#3F413E;
+  --pu-ink-500:#3F413E; --pu-paper:#F7F5F1; --pu-paper-dim:#EEEBE5;
+  --pu-line:#E0DCD4; --pu-green-700:#46736E; --pu-green-800:#3A605C;
+  --pu-signal:#038C7F; --pu-green-tint:#E1EFEC; --pu-danger:#D92D20;
   --pu-danger-800:#B8241A; --pu-danger-text:#D92D20; --pu-danger-tint:#FBEAE8;
   /* A solid green fill behind white/paper text (buttons, the chosen-slot dot,
      step numbers) needs to stay this dark in EITHER theme — unlike
@@ -62,7 +71,7 @@ export const TOKENS = `
      that same brightening drops a filled button's white-on-green contrast
      to ~2.4:1 (fails WCAG AA) if it shares the token. Same shades as
      light mode's green-700/800 — those already pass comfortably (5.2:1). */
-  --pu-green-fill:#0E7C4C; --pu-green-fill-hover:#0A5C3A;
+  --pu-green-fill:#46736E; --pu-green-fill-hover:#3A605C;
   /* Warn — added for the semantic layer below. Fill/border stays one
      value across themes, same discipline as --pu-green-fill above; a
      separate -text variant is redefined per theme below because #F5A623
@@ -71,18 +80,18 @@ export const TOKENS = `
      darkened amber for readable text while dark mode can stay near the
      brand hue. */
   --pu-warn:#F5A623; --pu-warn-text:#92400E; --pu-warn-tint:#FCEFD9;
-  --pu-font-display:"Schibsted Grotesk",system-ui,-apple-system,sans-serif;
-  --pu-font-ui:"Inter",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --pu-font-display:"Catamaran","Trebuchet MS",system-ui,sans-serif;
+  --pu-font-ui:"Mulish","Trebuchet MS",system-ui,-apple-system,sans-serif;
   --pu-font-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
-  --pu-radius:10px; --pu-radius-lg:16px;
-  --pu-shadow-sm:0 1px 2px rgba(15,21,18,.06);
+  --pu-radius:2px; --pu-radius-lg:2px;
+  --pu-shadow-sm:none;
   --pu-ring:0 0 0 3px color-mix(in srgb,var(--pu-green-700) 25%,transparent);
   /* Code blocks (docs pages): deliberately NOT redefined under the dark-mode
      media query or [data-theme=dark] below — a code panel that's always a
      dark "terminal" surface reads clearly against either a light or dark
      page background, which is simpler and more reliable than trying to keep
      a code block's syntax contrast correct across two flipped palettes. */
-  --pu-code-bg:#0F1512; --pu-code-fg:#E7F2EA; --pu-code-line:#2E3B34;
+  --pu-code-bg:#221F1F; --pu-code-fg:#DDEEEA; --pu-code-line:#3F413E;
 
   /* ---------------------------------------------------------------------
    * Semantic layer. Product UI states, one level above the raw
@@ -214,27 +223,27 @@ export const TOKENS = `
 }
 @media (prefers-color-scheme:dark){
   :root:not([data-theme=light]){
-    --pu-paper:#0F1512; --pu-paper-dim:#17201B; --pu-line:#2E3B34;
-    --pu-ink-950:#FAFAF7; --pu-ink-500:#9AA5A0; --pu-green-700:#1FC16B;
-    --pu-green-800:#3ED486; --pu-green-tint:#153A28; --pu-danger-text:#FF6B5B;
+    --pu-paper:#221F1F; --pu-paper-dim:#2C2929; --pu-line:#3F413E;
+    --pu-ink-950:#FFFFFF; --pu-ink-500:#DDEEEA; --pu-green-700:#A9D9D0;
+    --pu-green-800:#C4E6E0; --pu-green-tint:#2F4744; --pu-danger-text:#FF6B5B;
     --pu-danger-tint:#3A1A16; --pu-warn-text:#FBBF24; --pu-warn-tint:#3A2C12;
     --pu-shadow-sm:0 1px 2px rgba(0,0,0,.4);
-    --pu-surface-raised:#17201B;
-    --pu-text-muted:rgba(154,165,160,.72); --pu-text-disabled:rgba(154,165,160,.45);
+    --pu-surface-raised:#2C2929;
+    --pu-text-muted:rgba(221,238,234,.72); --pu-text-disabled:rgba(221,238,234,.45);
     --pu-surface-overlay:rgba(0,0,0,.6);
-    --pu-field-border:#3C4A42; --pu-url-bg:#0B100D;
+    --pu-field-border:#4A4C49; --pu-url-bg:#1A1818;
   }
 }
 :root[data-theme=dark]{
-  --pu-paper:#0F1512; --pu-paper-dim:#17201B; --pu-line:#2E3B34;
-  --pu-ink-950:#FAFAF7; --pu-ink-500:#9AA5A0; --pu-green-700:#1FC16B;
-  --pu-green-800:#3ED486; --pu-green-tint:#153A28; --pu-danger-text:#FF6B5B;
+  --pu-paper:#221F1F; --pu-paper-dim:#2C2929; --pu-line:#3F413E;
+  --pu-ink-950:#FFFFFF; --pu-ink-500:#DDEEEA; --pu-green-700:#A9D9D0;
+  --pu-green-800:#C4E6E0; --pu-green-tint:#2F4744; --pu-danger-text:#FF6B5B;
   --pu-danger-tint:#3A1A16; --pu-warn-text:#FBBF24; --pu-warn-tint:#3A2C12;
   --pu-shadow-sm:0 1px 2px rgba(0,0,0,.4);
-  --pu-surface-raised:#17201B;
-  --pu-text-muted:rgba(154,165,160,.72); --pu-text-disabled:rgba(154,165,160,.45);
+  --pu-surface-raised:#2C2929;
+  --pu-text-muted:rgba(221,238,234,.72); --pu-text-disabled:rgba(221,238,234,.45);
   --pu-surface-overlay:rgba(0,0,0,.6);
-  --pu-field-border:#3C4A42; --pu-url-bg:#0B100D;
+  --pu-field-border:#4A4C49; --pu-url-bg:#1A1818;
 }
 `
 
@@ -343,6 +352,12 @@ time,.pu-time{font-family:var(--pu-font-mono);font-variant-numeric:tabular-nums}
 .pu-mark{font-family:var(--pu-font-mono);font-weight:600;letter-spacing:-.02em;
   text-decoration:none;color:var(--pu-text-primary)}
 .pu-mark span{color:var(--pu-signal)}
+.pu-mark-logo{display:inline-block;line-height:0}
+.pu-mark-logo img{height:40px;width:auto}
+.pu-logo-dark{display:none}
+@media (prefers-color-scheme:dark){:root:not([data-theme=light]) .pu-logo-light{display:none}:root:not([data-theme=light]) .pu-logo-dark{display:inline}}
+:root[data-theme=dark] .pu-logo-light{display:none}
+:root[data-theme=dark] .pu-logo-dark{display:inline}
 
 .pu-grid{display:grid;gap:1.5rem;grid-template-columns:1fr}
 @media(min-width:780px){.pu-grid{grid-template-columns:300px 1fr}}

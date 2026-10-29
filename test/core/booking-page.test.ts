@@ -151,16 +151,15 @@ describe('eventHeader host identity', () => {
 })
 
 describe('shellFoot operator line', () => {
-  it('anchors the footer with the operator and keeps the wordmark as attribution', () => {
+  it('anchors the footer with the operator alone, no product attribution', () => {
     const html = shellFoot(true, false, 'Acme Inc')
-    expect(html).toContain('Acme Inc · scheduling by')
-    expect(html).toContain('punctual<span>:</span>')
-    expect(html).not.toContain('scheduling that shows up on time')
+    expect(html).toContain('<p class="pu-foot">Acme Inc</p>')
+    expect(html).not.toContain('punctual')
   })
 
-  it('keeps the product tagline when there is no operator', () => {
+  it('has no footer line when there is no operator', () => {
     const html = shellFoot(true, false, null)
-    expect(html).toContain('punctual<span>:</span></a> — scheduling that shows up on time')
+    expect(html).not.toContain('pu-foot')
   })
 
   it('escapes an attacker-controlled operator', () => {
@@ -169,29 +168,6 @@ describe('shellFoot operator line', () => {
     expect(html).toContain('&lt;img onerror=x&gt;')
   })
 
-  it('the wordmark links to punctual.sh, not this deployment\'s own homepage', () => {
-    // On a self-hosted install, "/" is that operator's own homepage — a
-    // guest clicking the wordmark wants the project, not a loop back into
-    // the same instance they're already on.
-    const html = shellFoot(true, false, 'Acme Inc')
-    expect(html).toContain('<a class="pu-mark" href="https://punctual.sh" target="_blank" rel="noopener">')
-    expect(html).not.toContain('href="/"')
-  })
-
-  it('the wordmark text stays literally "punctual" regardless of the deployment — it has no brandName parameter', () => {
-    // The mark links externally to punctual.sh; if it echoed a rebranded
-    // deployment's own BRAND_NAME as its text, "acme scheduler:" would open
-    // an unrelated site instead of Acme's own. Fixed as attribution to the
-    // open-source project, decoupled from any configurable display name.
-    const html = shellFoot(true, false, null)
-    expect(html).toContain('<a class="pu-mark" href="https://punctual.sh" target="_blank" rel="noopener">punctual<span>:</span></a>')
-  })
-
-  it('opens in a new tab even when embedded, so a click cannot navigate the customer\'s iframe away from the booking flow', () => {
-    const html = shellFoot(true, true, null)
-    expect(html).toContain('target="_blank"')
-    expect(html).toContain('rel="noopener"')
-  })
 })
 
 /**

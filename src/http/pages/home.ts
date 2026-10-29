@@ -10,7 +10,7 @@
 
 import type { CompanyLogo } from '../../core/domain/types.js'
 import type { HomeGroup, HomeItem, HomeOwner } from '../../core/domain/home.js'
-import { avatarHtml, escapeHtml, logoHtml, shellHead } from './booking.js'
+import { avatarHtml, brandLogoHtml, escapeHtml, logoHtml, shellHead } from './booking.js'
 
 export interface InstanceHomeData {
   brandName: string
@@ -24,9 +24,6 @@ export interface InstanceHomeData {
   groups: HomeGroup[]
   operator?: string
 }
-
-/** The Punctual site, for the one small line of attribution. */
-const PUNCTUAL_SITE_URL = 'https://punctual.sh'
 
 /**
  * Text with its URLs and addresses made clickable. One pass over the RAW
@@ -133,7 +130,8 @@ export function instanceHomePage(d: InstanceHomeData): string {
     ${d.companyLogo.shape === 'circle' ? `<div><p class="pu-host-name">${escapeHtml(title)}</p></div>` : ''}
   </div>
   <h1 class="pu-sr">${escapeHtml(title)}</h1>`
-    : `<h1>${escapeHtml(title)}</h1>`
+    : `${brandLogoHtml('/', d.brandName, 'margin-bottom:1.5rem')}
+  <h1>${escapeHtml(title)}</h1>`
   const contacts = [
     d.website ? `<a href="${escapeHtml(d.website)}" target="_blank" rel="noopener">${escapeHtml(hostLabel(d.website))}</a>` : '',
     d.contactEmail ? `<a href="mailto:${escapeHtml(d.contactEmail)}">${escapeHtml(d.contactEmail)}</a>` : '',
@@ -168,7 +166,7 @@ export function instanceHomePage(d: InstanceHomeData): string {
   ]
     .filter(Boolean)
     .join(' <span aria-hidden="true">·</span> ')}</p>
-  <p class="pu-home-foot-by">Scheduling by <a class="pu-mark" href="${PUNCTUAL_SITE_URL}" target="_blank" rel="noopener">punctual<span>:</span></a> <span aria-hidden="true">·</span> <a href="/login">Sign in</a></p>
+  <p class="pu-home-foot-by"><a href="/login">Sign in</a></p>
 </footer>
 </body></html>`
   )

@@ -139,7 +139,7 @@ describe('the instance homepage', () => {
     expect(html).toContain('href="/support/onboarding"')
     expect(html).toContain('with one of the team')
     expect(html).not.toContain('Calendly')
-    expect(html).toContain('Scheduling by')
+    expect(html).not.toContain('punctual')
     // The way to the dashboard, for the hosts, without a nav the guests do not need.
     expect(html).toContain('<a href="/login">Sign in</a>')
   })

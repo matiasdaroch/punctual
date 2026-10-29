@@ -53,7 +53,7 @@ import { slotStateClassName } from '../../core/slot-state.js'
 import { slugify } from '../../core/domain/booking-service.js'
 import { formatInZone, localDateString, offsetLabel } from '../../core/time/zone.js'
 import type { ResolvedHost } from '../../core/domain/hosts.js'
-import { avatarHtml, escapeHtml, hostsSentence, joinNames, logoHtml, shellFoot, shellHead } from './booking.js'
+import { avatarHtml, brandLogoHtml, escapeHtml, hostsSentence, joinNames, logoHtml, shellFoot, shellHead } from './booking.js'
 
 // ---------------------------------------------------------------------------
 // Chrome
@@ -153,7 +153,7 @@ function shellTop(chrome: DashboardChrome, title: string, active: NavKey | null)
   return (
     shellHead({ title: `${title} · ${chrome.brandName}`, brandName: chrome.brandName }) +
     `<header class="pu-dash-header">
-  <a class="pu-mark" href="/dashboard">${escapeHtml(chrome.brandName.toLowerCase())}<span>:</span></a>
+  ${brandLogoHtml('/dashboard', chrome.brandName)}
   <nav class="pu-nav" aria-label="Dashboard">
       ${links}
   </nav>
@@ -189,7 +189,7 @@ function shellBottom(brandName: string): string {
     `</div>
 <footer class="pu-dash-foot">
   <div class="pu-wrap pu-dash-foot-row">
-    <a class="pu-mark" href="/">${escapeHtml(brandName.toLowerCase())}<span>:</span></a>
+    ${brandLogoHtml('/', brandName)}
     <nav aria-label="Dashboard footer">
       <a href="/docs">Docs</a>
       <a href="/docs/api">API</a>
@@ -269,7 +269,7 @@ export function loginPage(d: LoginPageData): string {
     )
     .join('\n    ')
 
-  const mark = `<a class="pu-mark" href="/" style="display:inline-block;margin-bottom:1rem">${escapeHtml(d.brandName.toLowerCase())}<span>:</span></a>`
+  const mark = brandLogoHtml('/', d.brandName, 'display:inline-block;margin-bottom:1rem')
   const body = d.sent
     ? `${mark}
   <h1>Check your inbox</h1>

@@ -9,11 +9,11 @@ import { describe, expect, it } from 'vitest'
 import { loginPage } from '../../src/http/pages/dashboard.js'
 
 describe('loginPage', () => {
-  it('carries the wordmark above the heading, in both states', () => {
+  it('carries the brand logo above the heading, in both states', () => {
     for (const data of [{ sent: false }, { sent: true }]) {
       const html = loginPage({ brandName: 'Punctual', providers: [], ...data })
-      const mark = html.indexOf('<a class="pu-mark" href="/"')
-      expect(html).toContain('>punctual<span>:</span></a>')
+      const mark = html.indexOf('<a class="pu-mark pu-mark-logo" href="/"')
+      expect(html).toContain('src="/brand/mik/logo-light.svg" alt="Punctual"')
       expect(mark).toBeGreaterThan(-1)
       expect(mark).toBeLessThan(html.indexOf('<h1>'))
     }
