@@ -22,16 +22,18 @@ describe('readPrefill', () => {
 })
 
 describe('prefillValues', () => {
-  it('joins first and last name, and puts a phone number in the field\'s form', () => {
+  it('fills first and last name, and puts a phone number in the field\'s form', () => {
     expect(prefillValues(et, { first_name: 'Ana', last_name: 'Lopez', email: 'ana@x.com', phone: '+17867080880' })).toEqual({
-      name: 'Ana Lopez',
+      name: 'Ana',
+      last_name: 'Lopez',
       email: 'ana@x.com',
       phone: '+1 7867080880',
     })
   })
 
-  it('prefers name over first and last name', () => {
-    expect(prefillValues(et, { name: 'Ana L', first_name: 'Ana' })['name']).toBe('Ana L')
+  it('splits a whole name at its last space', () => {
+    expect(prefillValues(et, { name: 'Ana Maria  Lopez' })).toEqual({ name: 'Ana Maria', last_name: 'Lopez' })
+    expect(prefillValues(et, { name: 'Ana' })).toEqual({ name: 'Ana' })
   })
 })
 

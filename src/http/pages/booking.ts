@@ -848,11 +848,16 @@ export function confirmForm(
     ${d.embed ? '<input type="hidden" name="embed" value="1">' : ''}
     ${d.duration !== undefined ? `<input type="hidden" name="duration" value="${d.duration}">` : ''}
     ${opts.holdId ? `<input type="hidden" name="hold" value="${escapeHtml(opts.holdId)}">` : ''}
-    <label for="name">Your name</label>
-    <input id="name" name="name" required aria-required="true" autocomplete="name"
+    <label for="name">First name</label>
+    <input id="name" name="name" required aria-required="true" autocomplete="given-name"
            value="${escapeHtml(values['name'] ?? '')}"
            ${errors['name'] ? 'aria-describedby="err-name"' : ''}>
     ${errors['name'] ? `<p class="pu-err" id="err-name">${escapeHtml(errors['name'])}</p>` : ''}
+    <label for="last_name">Last name</label>
+    <input id="last_name" name="last_name" required aria-required="true" autocomplete="family-name"
+           value="${escapeHtml(values['last_name'] ?? '')}"
+           ${errors['last_name'] ? 'aria-describedby="err-last_name"' : ''}>
+    ${errors['last_name'] ? `<p class="pu-err" id="err-last_name">${escapeHtml(errors['last_name'])}</p>` : ''}
     <label for="email">Email</label>
     <input id="email" name="email" type="email" required aria-required="true" autocomplete="email"
            value="${escapeHtml(values['email'] ?? '')}"

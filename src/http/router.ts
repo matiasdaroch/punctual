@@ -566,7 +566,12 @@ export function buildRouter(ports: EnginePorts, slots: SlotService): Hono<{ Bind
     // surfaces as a bare 500. 8.64e15 is the JS Date range.
     if (!Number.isSafeInteger(start) || Math.abs(start) > 8.64e15) return notFound(c, ports)
     const guestTimezone = resolveGuestTimezone(String(form.get('tz') ?? ''), c.req.raw, host.tz)
-    const name = String(form.get('name') ?? '').trim()
+    // First and last name on the form, one name everywhere after: the
+    // booking stores and shows the two joined. A post without a last-name
+    // field (an older form, a script) is read as the whole name.
+    const firstName = String(form.get('name') ?? '').trim()
+    const lastName = String(form.get('last_name') ?? '').trim()
+    const name = [firstName, lastName].filter(Boolean).join(' ')
     const email = String(form.get('email') ?? '').trim()
     const holdId = form.get('hold') ? String(form.get('hold')) : undefined
     // The form posts to a query-string-free action, so embed state only
@@ -608,7 +613,8 @@ export function buildRouter(ports: EnginePorts, slots: SlotService): Hono<{ Bind
     )
     const declared = pickDeclaredAnswers(eventType, answers)
     const errors = validateAnswers(eventType, declared)
-    if (name === '') errors['name'] = 'Please tell us your name'
+    if (form.has('last_name') && lastName === '') errors['last_name'] = 'Please tell us your last name'
+    if (firstName === '') errors['name'] = form.has('last_name') ? 'Please tell us your first name' : 'Please tell us your name'
     // REST and MCP both cap this at 200; the public form did not. An oversized
     // name pushes the queued email past Cloudflare's 128 KB message limit, and
     // BOTH confirmations are lost while the slot stays booked.
@@ -629,7 +635,7 @@ export function buildRouter(ports: EnginePorts, slots: SlotService): Hono<{ Bind
           // effective question has a different id needs to reappear under
           // THAT id, or confirmForm's `values[q.id]` lookup renders it as
           // empty and the guest's typed text looks lost on the error page.
-          confirmForm(data, start, { errors, values: { name, email, ...declared, ...locationFormValues(form), guests: guestsText }, holdId }) +
+          confirmForm(data, start, { errors, values: { name: firstName, last_name: lastName, email, ...declared, ...locationFormValues(form), guests: guestsText }, holdId }) +
           shellFoot(true, embed, displayCompany(data)),
         400,
       )

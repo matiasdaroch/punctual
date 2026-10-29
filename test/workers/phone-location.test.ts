@@ -149,7 +149,8 @@ describe('prefilled links', () => {
     const html = await (
       await fetchPage(`/phone-host/with-question/confirm?start=${start}&tz=UTC&first_name=Ana&last_name=Lopez&email=ana%40example.com&phone=%2B573001234567`)
     ).text()
-    expect(html).toMatch(/<input id="name" name="name"[^>]*\n?\s*value="Ana Lopez"/)
+    expect(html).toMatch(/<input id="name" name="name"[^>]*\n?\s*value="Ana"/)
+    expect(html).toMatch(/<input id="last_name" name="last_name"[^>]*\n?\s*value="Lopez"/)
     expect(html).toMatch(/<input id="email" name="email"[^>]*\n?\s*value="ana@example.com"/)
     expect(html).toContain('<option value="CO" selected>Colombia +57</option>')
     expect(html).toContain('value="3001234567"')
@@ -178,5 +179,25 @@ describe('docs', () => {
     const html = await res.text()
     expect(html).toContain('first_name, last_name')
     expect(html).toContain('%2B17867080880')
+  })
+})
+
+describe('first and last name', () => {
+  const start = Date.UTC(2031, 0, 15, 15, 0)
+
+  it('asks for both, and keeps what was typed', async () => {
+    const res = await post('/phone-host/no-question/confirm', {
+      start: String(start),
+      tz: 'UTC',
+      name: 'Ana',
+      last_name: '',
+      email: 'ana@example.com',
+      location: '1',
+    })
+    expect(res.status).toBe(400)
+    const html = await res.text()
+    expect(html).toContain('<label for="last_name">Last name</label>')
+    expect(html).toContain('Please tell us your last name')
+    expect(html).toMatch(/<input id="name" name="name"[^>]*\n?\s*value="Ana"/)
   })
 })

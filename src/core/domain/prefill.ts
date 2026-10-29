@@ -32,16 +32,24 @@ export function readPrefill(et: EventType, get: (name: string) => string | undef
 }
 
 /**
- * The confirm form's starting values from a link's prefill: `name`, or
- * first and last name joined; `email`; `guests`; and each question's answer
- * under its id, a phone number put in the form the phone field reads.
+ * The confirm form's starting values from a link's prefill: first and last
+ * name into their own fields (a whole `name` splits at its last space);
+ * `email`; `guests`; and each question's answer under its id, a phone number
+ * put in the form the phone field reads.
  */
 export function prefillValues(et: EventType, prefill: Record<string, string>): Record<string, string> {
   const values: Record<string, string> = {}
   const first = (prefill['first_name'] ?? prefill['firstname'] ?? '').trim()
   const last = (prefill['last_name'] ?? prefill['lastname'] ?? '').trim()
-  const name = (prefill['name'] ?? '').trim() || [first, last].filter(Boolean).join(' ')
-  if (name) values['name'] = name
+  const whole = (prefill['name'] ?? '').trim().replace(/\s+/g, ' ')
+  if (first || last) {
+    if (first) values['name'] = first
+    if (last) values['last_name'] = last
+  } else if (whole) {
+    const cut = whole.lastIndexOf(' ')
+    values['name'] = cut === -1 ? whole : whole.slice(0, cut)
+    if (cut !== -1) values['last_name'] = whole.slice(cut + 1)
+  }
   if (prefill['email']) values['email'] = prefill['email'].trim()
   if (prefill['guests']) values['guests'] = prefill['guests'].trim()
   for (const q of effectiveQuestions(et)) {

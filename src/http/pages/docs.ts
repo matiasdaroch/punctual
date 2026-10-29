@@ -653,8 +653,8 @@ ${row('location', 'A place by kind: <code>meet</code>, <code>phone</code>, <code
 <div class="pu-docs-table-wrap"><table>
 <thead><tr><th scope="col">Parameter</th><th scope="col">Fills</th><th scope="col">Example</th></tr></thead>
 <tbody>
-${row('name', 'Their name.', '?name=Ana%20Lopez')}
-${row('first_name, last_name', 'Their name, joined with a space (when <code>name</code> is not given). <code>firstname</code> and <code>lastname</code> work too.', '?first_name=Ana&last_name=Lopez')}
+${row('first_name, last_name', 'Their first and last name, each in its own field. <code>firstname</code> and <code>lastname</code> work too.', '?first_name=Ana&last_name=Lopez')}
+${row('name', 'Their whole name, split at the last space: the last word is the last name.', '?name=Ana%20Maria%20Lopez')}
 ${row('email', 'Their email.', '?email=ana@example.com')}
 ${row('guests', 'People to invite along, on an event that allows guests. Commas between addresses.', '?guests=a@x.com,b@y.com')}
 ${row('&lt;question id&gt;', 'The answer to one of the event\'s questions (see below).', '?phone=%2B17867080880')}
