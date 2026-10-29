@@ -18,7 +18,7 @@
  * canonical source on GitHub instead of being re-derived here.
  */
 
-import { escapeHtml } from './booking.js'
+import { brandLogoHtml, escapeHtml } from './booking.js'
 import { DEFAULT_GITHUB_URL, footer, shell } from './landing.js'
 
 export interface DocsPageOptions {
@@ -70,7 +70,7 @@ function docsPage(opts: DocsPageOptions, activePath: string, title: string, lede
 
   const body = `<div class="pu-landing">
 <header class="pu-hero pu-docs-hero">
-  <p class="pu-mark"><a href="/" style="color:inherit;text-decoration:none">punctual<span>:</span></a></p>
+  <div style="display:flex;justify-content:center">${brandLogoHtml('/', opts.brandName)}</div>
   <h1>${escapeHtml(title)}</h1>
   <p class="pu-hero-lede">${escapeHtml(lede)}</p>
 </header>
