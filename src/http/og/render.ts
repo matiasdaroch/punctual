@@ -23,7 +23,7 @@ import { Resvg, initWasm } from '@resvg/resvg-wasm'
 import resvgWasmModule from '../../../node_modules/@resvg/resvg-wasm/index_bg.wasm'
 
 import { buildOgCard, type OgAvatar } from './card.js'
-import { plexMonoSubset, schibstedGroteskSubset } from './fonts.js'
+import { catamaran400Subset, catamaran600Subset, mulish500Subset, mulish700Subset } from './fonts.js'
 import { isRenderSafe } from './safety.js'
 
 export interface OgRenderInput {
@@ -73,13 +73,10 @@ export async function renderOgCard(input: OgRenderInput): Promise<Uint8Array | n
       width: WIDTH,
       height: HEIGHT,
       fonts: [
-        { name: 'IBM Plex Mono', data: plexMonoSubset().buffer as ArrayBuffer, weight: 600, style: 'normal' },
-        {
-          name: 'Schibsted Grotesk',
-          data: schibstedGroteskSubset().buffer as ArrayBuffer,
-          weight: 600,
-          style: 'normal',
-        },
+        { name: 'Catamaran', data: catamaran600Subset().buffer as ArrayBuffer, weight: 600, style: 'normal' },
+        { name: 'Catamaran', data: catamaran400Subset().buffer as ArrayBuffer, weight: 400, style: 'normal' },
+        { name: 'Mulish', data: mulish700Subset().buffer as ArrayBuffer, weight: 700, style: 'normal' },
+        { name: 'Mulish', data: mulish500Subset().buffer as ArrayBuffer, weight: 500, style: 'normal' },
       ],
     })
 

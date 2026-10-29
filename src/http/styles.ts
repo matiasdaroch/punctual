@@ -48,12 +48,6 @@ export const FONT_FACES = `
 @font-face{font-family:"IBM Plex Mono";font-style:normal;font-weight:700;font-display:optional;
   src:url(/fonts/ibmplexmono-700.woff2) format("woff2");
   unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
-@font-face{font-family:"Inter";font-style:normal;font-weight:400 700;font-display:optional;
-  src:url(/fonts/inter-variable.woff2) format("woff2");
-  unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
-@font-face{font-family:"Schibsted Grotesk";font-style:normal;font-weight:600;font-display:optional;
-  src:url(/fonts/schibstedgrotesk-600.woff2) format("woff2");
-  unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
 `
 
 export const TOKENS = `
@@ -228,7 +222,6 @@ export const TOKENS = `
     --pu-ink-950:#FFFFFF; --pu-ink-500:#DDEEEA; --pu-green-700:#A9D9D0;
     --pu-green-800:#C4E6E0; --pu-green-tint:#2F4744; --pu-danger-text:#FF6B5B;
     --pu-danger-tint:#3A1A16; --pu-warn-text:#FBBF24; --pu-warn-tint:#3A2C12;
-    --pu-shadow-sm:0 1px 2px rgba(0,0,0,.4);
     --pu-surface-raised:#2C2929;
     --pu-text-muted:rgba(221,238,234,.72); --pu-text-disabled:rgba(221,238,234,.45);
     --pu-surface-overlay:rgba(0,0,0,.6);
@@ -240,7 +233,6 @@ export const TOKENS = `
   --pu-ink-950:#FFFFFF; --pu-ink-500:#DDEEEA; --pu-green-700:#A9D9D0;
   --pu-green-800:#C4E6E0; --pu-green-tint:#2F4744; --pu-danger-text:#FF6B5B;
   --pu-danger-tint:#3A1A16; --pu-warn-text:#FBBF24; --pu-warn-tint:#3A2C12;
-  --pu-shadow-sm:0 1px 2px rgba(0,0,0,.4);
   --pu-surface-raised:#2C2929;
   --pu-text-muted:rgba(221,238,234,.72); --pu-text-disabled:rgba(221,238,234,.45);
   --pu-surface-overlay:rgba(0,0,0,.6);
@@ -310,7 +302,7 @@ time,.pu-time{font-family:var(--pu-font-numeric);font-variant-numeric:tabular-nu
 .pu-home-intro a,.pu-home-contacts a,.pu-home-foot a{color:var(--pu-ink-950);text-decoration:underline;text-decoration-color:var(--pu-line);text-underline-offset:.15em}
 .pu-home-intro a:hover,.pu-home-contacts a:hover,.pu-home-foot a:hover{text-decoration-color:var(--pu-green-fill)}
 .pu-home-contacts{margin:1rem 0 0;font-size:.9375rem;color:var(--pu-text-secondary)}
-.pu-home-featured{display:flex;flex-direction:column;gap:.6rem;padding:1.25rem 1.35rem;border:1px solid var(--pu-line);border-radius:14px;background:var(--pu-surface-raised);color:inherit;text-decoration:none}
+.pu-home-featured{display:flex;flex-direction:column;gap:.6rem;padding:1.25rem 1.35rem;border:1px solid var(--pu-line);border-radius:var(--pu-radius);background:var(--pu-surface-raised);color:inherit;text-decoration:none}
 .pu-home-featured:hover,.pu-home-featured:focus-visible{border-color:var(--pu-green-fill);outline:0}
 .pu-home-featured-who{display:flex;align-items:center;gap:.6rem;font-size:.9375rem;line-height:1.3}
 .pu-home-featured-title{font-family:var(--pu-font-display);font-weight:600;font-size:1.375rem;line-height:1.2;margin-top:.25rem}
@@ -320,7 +312,7 @@ time,.pu-time{font-family:var(--pu-font-numeric);font-variant-numeric:tabular-nu
 .pu-home-group-head h2{margin:0;font-size:1.125rem}
 .pu-home-group-head p{margin:.1rem 0 0;font-size:.875rem}
 .pu-home-list{list-style:none;margin:0;padding:0;display:grid;gap:.75rem;grid-template-columns:repeat(auto-fill,minmax(17rem,1fr))}
-.pu-home-item{display:flex;flex-direction:column;gap:.35rem;padding:1rem 1.1rem;border:1px solid var(--pu-line);border-radius:12px;background:var(--pu-surface-raised);color:inherit;text-decoration:none;min-height:100%}
+.pu-home-item{display:flex;flex-direction:column;gap:.35rem;padding:1rem 1.1rem;border:1px solid var(--pu-line);border-radius:var(--pu-radius);background:var(--pu-surface-raised);color:inherit;text-decoration:none;min-height:100%}
 .pu-home-item:hover,.pu-home-item:focus-visible{border-color:var(--pu-green-fill);outline:0}
 .pu-home-item-title{font-family:var(--pu-font-display);font-weight:600;font-size:1.0625rem}
 .pu-home-item-meta{display:flex;align-items:center;gap:.4rem;font-size:.875rem;color:var(--pu-text-secondary)}
@@ -1011,7 +1003,7 @@ export const LANDING_CSS = `
 .pu-docs-content ul,.pu-docs-content ol{padding-left:1.25rem;margin:0 0 1rem}
 .pu-docs-content li{margin-bottom:.4rem}
 .pu-docs-content code{font-family:var(--pu-font-mono);font-size:.875em;background:var(--pu-paper-dim);
-  border:1px solid var(--pu-line);border-radius:4px;padding:.05rem .35rem}
+  border:1px solid var(--pu-line);border-radius:var(--pu-radius);padding:.05rem .35rem}
 
 /* Code blocks: an always-dark terminal surface (see --pu-code-* in TOKENS'
    :root, deliberately not redefined for dark mode) so a multi-line snippet

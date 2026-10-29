@@ -18,7 +18,7 @@ export interface OgElement {
   props: { children?: OgElement | OgElement[] | string; style?: Record<string, string | number>; [key: string]: unknown }
 }
 
-/** One face on the card: a PNG data URI when the host uploaded a photo, else an initial on the brand green. */
+/** One face on the card: a PNG data URI when the host uploaded a photo, else an initial on the main green. */
 export interface OgAvatar {
   src?: string
   initial: string
@@ -48,15 +48,15 @@ const SINGLE_SIZE = 220
 const STACK_SIZE = 132
 
 function avatarNode(a: OgAvatar, size: number, overlap = 0): OgElement {
-  const ring = { border: `6px solid ${INK}`, borderRadius: '50%' }
+  const ring = { border: `6px solid ${GROUND}`, borderRadius: '50%' }
   if (a.src && a.aspect) {
     // A logo in its own proportions: height-aligned, width from the
-    // aspect, capped so a banner stays inside the card, soft corners
-    // rather than a circle.
+    // aspect, capped so a banner stays inside the card, square corners
+    // (the design system's radius) rather than a circle.
     const width = Math.min(Math.round(size * a.aspect), 720)
     return {
       type: 'img',
-      props: { src: a.src, width, height: size, style: { width: `${width}px`, height: `${size}px`, objectFit: 'contain', borderRadius: '16px' } },
+      props: { src: a.src, width, height: size, style: { width: `${width}px`, height: `${size}px`, objectFit: 'contain', borderRadius: '2px' } },
     }
   }
   if (a.src) {
@@ -81,9 +81,9 @@ function avatarNode(a: OgAvatar, size: number, overlap = 0): OgElement {
         width: `${size}px`,
         height: `${size}px`,
         marginLeft: `${-overlap}px`,
-        backgroundColor: '#0E7C4C',
-        color: PAPER,
-        fontFamily: MONO,
+        backgroundColor: MIK_GREEN,
+        color: WHITE,
+        fontFamily: DISPLAY,
         fontSize: `${Math.round(size * 0.42)}px`,
         fontWeight: 600,
       },
@@ -109,10 +109,10 @@ function avatarsNode(avatars: OgAvatar[], extraCount: number): OgElement {
           height: `${STACK_SIZE}px`,
           marginLeft: '-28px',
           borderRadius: '50%',
-          border: `6px solid ${INK}`,
-          backgroundColor: '#2A332E',
-          color: PAPER,
-          fontFamily: MONO,
+          border: `6px solid ${GROUND}`,
+          backgroundColor: MIK_BLACK,
+          color: WHITE,
+          fontFamily: DISPLAY,
           fontSize: '44px',
           fontWeight: 600,
         },
@@ -123,14 +123,19 @@ function avatarsNode(avatars: OgAvatar[], extraCount: number): OgElement {
   return { type: 'div', props: { style: { display: 'flex', alignItems: 'center' }, children: faces } }
 }
 
-const INK = '#0F1512'
-const PAPER = '#FAFAF7'
-const SIGNAL_GREEN = '#1FC16B'
-/** Paper at reduced opacity reads as "muted label" without a third color token. */
-const PAPER_MUTED = 'rgba(250,250,247,0.55)'
+// MIK customization: the MIK Architecture design system's brand page --
+// surface-brand (mik-green-dark) with white headlines, the closing phrase in
+// mik-green-light and mist for the small print.
+const GROUND = '#46736E'
+const WHITE = '#FFFFFF'
+const ACCENT = '#A9D9D0'
+const MIST = '#DDEEEA'
+const MIK_GREEN = '#038C7F'
+const MIK_BLACK = '#221F1F'
 
-const MONO = 'IBM Plex Mono'
-const DISPLAY = 'Schibsted Grotesk'
+const DISPLAY = 'Catamaran'
+const BASELINE_NUDGE = 3
+const BODY = 'Mulish'
 
 /** Longer host/event combinations still fit at 1200x630 without overflowing satori's layout. */
 function titleFontSize(titleLine: string, subtitleLine: string): number {
@@ -153,12 +158,12 @@ export function buildOgCard(props: OgCardProps): OgElement {
         flexDirection: 'column',
         width: '1200px',
         height: '630px',
-        backgroundColor: INK,
+        backgroundColor: GROUND,
         padding: '64px',
         fontFamily: DISPLAY,
       },
       children: [
-        wordmark(props.brandName),
+        lockup(props.brandName),
         {
           type: 'div',
           props: {
@@ -174,14 +179,14 @@ export function buildOgCard(props: OgCardProps): OgElement {
               {
                 type: 'div',
                 props: {
-                  style: { display: 'flex', color: PAPER, fontSize: `${fontSize}px`, fontWeight: 600 },
+                  style: { display: 'flex', color: WHITE, fontSize: `${fontSize}px`, lineHeight: 1.05, fontWeight: 600 },
                   children: props.titleLine,
                 },
               },
               {
                 type: 'div',
                 props: {
-                  style: { display: 'flex', color: SIGNAL_GREEN, fontSize: `${fontSize}px`, fontWeight: 600 },
+                  style: { display: 'flex', color: ACCENT, fontSize: `${fontSize}px`, lineHeight: 1.05, fontWeight: 600 },
                   children: props.subtitleLine,
                 },
               },
@@ -193,10 +198,10 @@ export function buildOgCard(props: OgCardProps): OgElement {
           props: {
             style: {
               display: 'flex',
-              color: SIGNAL_GREEN,
-              fontFamily: MONO,
+              color: MIST,
+              fontFamily: BODY,
               fontSize: '30px',
-              fontWeight: 600,
+              fontWeight: 500,
             },
             children: props.timeLabel,
           },
@@ -206,22 +211,28 @@ export function buildOgCard(props: OgCardProps): OgElement {
   }
 }
 
-/** `punctual:` — the wordmark with its colon in signal green (docs/branding/brand.md §1). */
-function wordmark(brandName: string): OgElement {
-  return {
-    type: 'div',
-    props: {
-      style: {
-        display: 'flex',
-        fontFamily: MONO,
-        fontSize: '28px',
-        fontWeight: 600,
-        color: PAPER_MUTED,
+/**
+ * MIK customization: the design system's text-only logo in white, replacing
+ * the `punctual:` wordmark. The first word in Mulish Bold, the rest in
+ * Catamaran Regular a hair larger so the cap heights meet, uppercase, on one
+ * baseline -- the same build as the emails' header (email-templates.ts).
+ */
+function lockup(brandName: string): OgElement {
+  const [first = '', ...rest] = brandName.trim().split(/\s+/)
+  const children: OgElement[] = [
+    { type: 'span', props: { style: { fontFamily: BODY, fontWeight: 700, fontSize: '28px', lineHeight: 1 }, children: first.toUpperCase() } },
+  ]
+  if (rest.length > 0) {
+    children.push({
+      type: 'span',
+      props: {
+        // satori lines up the two spans' boxes, not their baselines, and
+        // Catamaran's tall vertical metrics would ride it high; the nudge
+        // puts both words back on one baseline.
+        style: { fontFamily: DISPLAY, fontWeight: 400, fontSize: '29px', lineHeight: 1, letterSpacing: '0.04em', marginLeft: '10px', position: 'relative', top: `${BASELINE_NUDGE}px` },
+        children: rest.join(' ').toUpperCase(),
       },
-      children: [
-        { type: 'span', props: { children: brandName.toLowerCase() } },
-        { type: 'span', props: { style: { color: SIGNAL_GREEN }, children: ':' } },
-      ],
-    },
+    })
   }
+  return { type: 'div', props: { style: { display: 'flex', alignItems: 'flex-end', color: WHITE }, children } }
 }

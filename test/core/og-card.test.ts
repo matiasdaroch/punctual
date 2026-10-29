@@ -38,15 +38,16 @@ describe('buildOgCard', () => {
       titleLine: 'Book 30 min',
       subtitleLine: 'with Serge',
       timeLabel: '10:30 GMT+3',
-      brandName: 'Punctual',
+      brandName: 'MIK Architecture',
     })
     const serialised = JSON.stringify(tree)
     expect(serialised).toContain('Book 30 min')
     expect(serialised).toContain('with Serge')
     expect(serialised).toContain('10:30 GMT+3')
-    // Lowercased, colon-mark wordmark (docs/branding/brand.md §1) — never the title-cased brand name.
-    expect(serialised).toContain('punctual')
-    expect(serialised).not.toContain('Punctual')
+    // The MIK text-only logo: uppercase, MIK in Mulish Bold, ARCHITECTURE in Catamaran Regular.
+    expect(serialised).toMatch(/"fontFamily":"Mulish","fontWeight":700[^}]*\},"children":"MIK"/)
+    expect(serialised).toMatch(/"fontFamily":"Catamaran","fontWeight":400[^}]*\},"children":"ARCHITECTURE"/)
+    expect(serialised).not.toContain('MIK Architecture')
   })
 })
 
