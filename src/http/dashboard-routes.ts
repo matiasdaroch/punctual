@@ -30,6 +30,7 @@
  */
 
 import { buildIcs, icsUidForBooking } from '../core/ics.js'
+import { descriptionHtml } from '../core/domain/calendar-text.js'
 import { MAX_DURATION_OPTIONS, forBooking, parseDurationOptions } from '../core/domain/booking-options.js'
 import {
   locationsFromRows,
@@ -3243,7 +3244,8 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
         { email: booking.guestEmail, name: booking.guestName },
         ...(hosts.length > 0 ? hosts : [host]).map((h) => ({ email: h.email, name: h.name || h.slug })),
       ],
-      description: [eventType.description.trim(), `Reschedule or cancel: ${manageUrl}`].filter(Boolean).join('\n\n'),
+      description: [eventType.description.trim(), `Need to reschedule or cancel? ${manageUrl}`].filter(Boolean).join('\n\n'),
+      htmlDescription: descriptionHtml(eventType.description.trim(), manageUrl),
       url: manageUrl,
     })
     return c.body(ics, 200, {

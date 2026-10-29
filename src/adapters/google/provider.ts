@@ -17,6 +17,7 @@
  * auto-populating them.
  */
 
+import { descriptionHtml } from '../../core/domain/calendar-text.js'
 import type { CalendarConnection, Interval } from '../../core/domain/types.js'
 import type { CalendarProvider, ExternalEvent } from '../../ports.js'
 import { stableEventIds } from '../calendar-ids.js'
@@ -350,7 +351,9 @@ export function googleConferenceUrl(created: Record<string, unknown>): { confere
 export function toGoogleEvent(event: ExternalEvent, conferenceRequestId?: string): Record<string, unknown> {
   const body: Record<string, unknown> = {
     summary: event.title,
-    description: event.description,
+    // HTML when there is a link to put behind words; Google renders a
+    // description's <a> and <br>.
+    description: event.manageUrl ? descriptionHtml(event.description, event.manageUrl) : event.description,
     // Instants are already UTC; `timeZone` travels alongside so Google renders
     // and expands the event in the host's zone rather than the viewer's guess.
     start: { dateTime: new Date(event.start).toISOString(), timeZone: event.timezone },

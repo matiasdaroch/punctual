@@ -17,6 +17,7 @@
  * `onlineMeetingProvider: "teamsForBusiness"` on event creation.
  */
 
+import { descriptionHtml } from '../../core/domain/calendar-text.js'
 import type { Interval } from '../../core/domain/types.js'
 import type { CalendarProvider, ExternalEvent } from '../../ports.js'
 import { stableEventIds } from '../calendar-ids.js'
@@ -316,7 +317,7 @@ export function toGraphEvent(event: ExternalEvent, transactionId?: string): Reco
     subject: event.title,
     // The description is plain text with line breaks; as HTML those
     // collapse into one paragraph unless made explicit.
-    body: { contentType: 'HTML', content: textToHtml(event.description) },
+    body: { contentType: 'HTML', content: descriptionHtml(event.description, event.manageUrl) },
     // UTC rather than `event.timezone`: Outlook renders every event in the
     // viewer's own zone anyway, and Graph's IANA support varies by tenant, so
     // naming UTC is the reading that cannot be misinterpreted.

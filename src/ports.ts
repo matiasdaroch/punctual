@@ -598,6 +598,11 @@ export interface ExternalEvent {
   /** `optional` marks a host who joins when free (Google `optional`, Graph `type: optional`). */
   attendees: Array<{ email: string; name?: string; optional?: boolean }>
   location?: string
+  /**
+   * The guest's reschedule-or-cancel link, shown behind the words "Need to
+   * reschedule or cancel?" where the provider renders HTML descriptions.
+   */
+  manageUrl?: string
   /** Ask the provider to mint a conference link (Google Meet). */
   createConference?: boolean
   timezone: string

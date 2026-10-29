@@ -13,7 +13,7 @@
 
 import type { Booking, EventType, User, WebhookEvent } from '../core/domain/types.js'
 import type { EnginePorts } from '../ports.js'
-import { calendarDescription, calendarTitle, participantsFor } from '../core/domain/calendar-text.js'
+import { calendarDescription, calendarTitle, descriptionHtml, participantsFor } from '../core/domain/calendar-text.js'
 import { hostSettings } from '../core/domain/hosts.js'
 import type { NotificationChannel } from '../core/domain/chat-notify.js'
 import {
@@ -514,14 +514,20 @@ async function invitationText(
   eventType: EventType,
   hosts: User[],
   manageUrl?: string,
-): Promise<{ summary: string; description: string }> {
+): Promise<{ summary: string; description: string; htmlDescription?: string }> {
   const settings = await hostSettings(ports.repositories({ consistency: 'unconstrained' }), eventType)
   const participants = participantsFor(
     eventType,
     booking,
     hosts.map((user) => ({ user, optional: settings.get(user.id)?.required === false })),
   )
-  return { summary: calendarTitle(eventType, participants), description: calendarDescription(eventType, booking, participants, manageUrl) }
+  return {
+    summary: calendarTitle(eventType, participants),
+    // Plain text has nowhere to hide the link, so it is spelled out there;
+    // the HTML copy puts it behind words.
+    description: calendarDescription(eventType, booking, participants, manageUrl),
+    ...(manageUrl ? { htmlDescription: descriptionHtml(calendarDescription(eventType, booking, participants), manageUrl) } : {}),
+  }
 }
 
 /**

@@ -237,7 +237,9 @@ describe('after booking: add to calendar', () => {
     expect(ok.headers.get('content-type')).toContain('text/calendar')
     const ics = (await ok.text()).replace(/\r\n /g, '')
     expect(ics).toContain('LOCATION:1385 Coral Way')
-    expect(ics).toContain('Reschedule or cancel: https://punctual.test/booking/')
+    expect(ics).toContain('Need to reschedule or cancel? https://punctual.test/booking/')
+    expect(ics).toContain('X-ALT-DESC;FMTTYPE=text/html:')
+    expect(ics).toContain('>Need to reschedule or cancel?</a>')
 
     const denied = await fetchIt(`/booking/${outcome.booking.id}/invite.ics?token=nope`)
     expect(denied.headers.get('content-type') ?? '').not.toContain('text/calendar')

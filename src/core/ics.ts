@@ -53,6 +53,8 @@ export interface IcsInput {
   dtstamp?: number
   /** Replaces the generated body of DESCRIPTION when supplied. */
   description?: string
+  /** The same description as HTML, for the clients that read `X-ALT-DESC` (Outlook). */
+  htmlDescription?: string
   /** Replaces the event type's title as SUMMARY when supplied — the calendar title naming the participants. */
   summary?: string
 }
@@ -347,6 +349,7 @@ export function buildIcs(input: IcsInput): string {
     `DTEND:${icsDateTimeUtc(booking.endUtc)}`,
     `SUMMARY:${escapeText(input.summary ?? et.title)}`,
     `DESCRIPTION:${escapeText(input.description ?? defaultDescription(booking, et))}`,
+    ...(input.htmlDescription ? [`X-ALT-DESC;FMTTYPE=text/html:${escapeText(input.htmlDescription)}`] : []),
     `LOCATION:${escapeText(describeLocation(et, booking.conferenceUrl))}`,
     `STATUS:${status}`,
     // Cancelled time no longer blocks the attendee's calendar.

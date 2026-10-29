@@ -247,7 +247,8 @@ async function syncCalendar(
   const manageUrl = msg.manageToken
     ? `${ports.config.baseUrl.replace(/\/$/, '')}/booking/${booking.id}?token=${encodeURIComponent(msg.manageToken)}`
     : undefined
-  const description = calendarDescription(eventType, booking, plan.participants, manageUrl)
+  // The link rides separately, so each provider can put it behind words.
+  const description = calendarDescription(eventType, booking, plan.participants)
   const externalFor = (conn: CalendarConnection, attendees: ExternalEvent['attendees']): ExternalEvent => ({
     title,
     description,
@@ -259,6 +260,7 @@ async function syncCalendar(
     end: booking.endUtc,
     attendees,
     timezone: plan.organizerTz.get(conn.id) ?? booking.guestTimezone,
+    ...(manageUrl ? { manageUrl } : {}),
     // Mint a conference only until ONE exists for this booking; every later
     // event reuses it as the location instead.
     createConference: eventType.locationType === 'google_meet' && !conferenceRequested,

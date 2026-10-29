@@ -155,6 +155,20 @@ export function calendarDescription(
   blocks.push(['Participants', ...participants.map(participantLine)].join('\n'))
   const answers = answeredQuestions(eventType, booking.answers).map(({ question, value }) => `${question.label}: ${value}`)
   if (answers.length > 0) blocks.push(answers.join('\n'))
-  if (manageUrl) blocks.push(`Need to change it? Reschedule or cancel: ${manageUrl}`)
+  if (manageUrl) blocks.push(`Need to reschedule or cancel? ${manageUrl}`)
   return blocks.join('\n\n')
+}
+
+/**
+ * The description as HTML, for the calendars that render it (Google,
+ * Microsoft, and Outlook's reading of an .ics `X-ALT-DESC`): the plain text
+ * with its line breaks kept, then the guest's link behind the words "Need
+ * to reschedule or cancel?" rather than spelled out. `text` must not carry
+ * the link itself; pass it as `manageUrl`.
+ */
+export function descriptionHtml(text: string, manageUrl?: string): string {
+  const html = text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/\n/g, '<br>')
+  if (!manageUrl) return html
+  const href = manageUrl.replace(/&/g, '&amp;').replace(/"/g, '&quot;')
+  return `${html}${html ? '<br><br>' : ''}<a href="${href}">Need to reschedule or cancel?</a>`
 }
