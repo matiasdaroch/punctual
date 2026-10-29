@@ -232,7 +232,7 @@ export function buildRouter(ports: EnginePorts, slots: SlotService): Hono<{ Bind
   // common rejection. Registered before the /:userSlug/:eventSlug catch-all.
   const legal = () => ({
     brandName: ports.config.brandName,
-    supportEmail: ports.config.supportEmail,
+    supportEmail: ports.config.legalEmail ?? ports.config.supportEmail,
     baseUrl: ports.config.baseUrl,
     // The actual data controller — Google's OAuth verification checks this
     // against the real legal entity behind the app, and "Punctual" (the

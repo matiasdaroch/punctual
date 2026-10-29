@@ -909,6 +909,8 @@ export interface EngineConfig {
    */
   demoBookingPath?: string
   supportEmail: string
+  /** The contact on /privacy and /terms (LEGAL_EMAIL); supportEmail when unset. */
+  legalEmail?: string
   fromEmail: string
   fromName: string
   /**

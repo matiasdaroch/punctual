@@ -118,6 +118,8 @@ FROM_NAME = "Punctual"
 # the dashboard rather than quietly falling back to another sender.
 #EMAIL_PROVIDER = "cloudflare"   # cloudflare | resend | brevo | console
 SUPPORT_EMAIL = "you@your-domain.example"
+# Optional: a separate contact for /privacy and /terms (defaults to SUPPORT_EMAIL).
+#LEGAL_EMAIL = "privacy@your-domain.example"
 # Off unless explicitly enabled (ADR-0006 §5).
 TELEMETRY_ENABLED = "0"
 

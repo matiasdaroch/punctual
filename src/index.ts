@@ -51,6 +51,8 @@ export interface Env {
   FROM_EMAIL?: string
   FROM_NAME?: string
   SUPPORT_EMAIL?: string
+  /** The address on /privacy and /terms; defaults to SUPPORT_EMAIL. */
+  LEGAL_EMAIL?: string
   TELEMETRY_ENABLED?: string
   ENCRYPTION_KEY_V1?: string
   ENCRYPTION_KEY_V2?: string
@@ -213,6 +215,7 @@ export function buildPorts(env: Env): EnginePorts {
       ...(env.GA_MEASUREMENT_ID ? { analyticsId: env.GA_MEASUREMENT_ID } : {}),
       ...(env.SIGNUPS ? { signupPolicy: parseSignupPolicy(env.SIGNUPS) } : {}),
       supportEmail: env.SUPPORT_EMAIL ?? 'hello@example.com',
+      ...(env.LEGAL_EMAIL ? { legalEmail: env.LEGAL_EMAIL } : {}),
       fromEmail: env.FROM_EMAIL ?? 'hello@example.com',
       fromName: env.FROM_NAME ?? 'Punctual',
       emailDelivery,
