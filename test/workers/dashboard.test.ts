@@ -499,8 +499,47 @@ describe('event types — form', () => {
     expect(html).toMatch(/<input id="title"[^>]* autofocus>/)
     expect(html.match(/ autofocus/g)).toHaveLength(1)
     expect(html).toContain('Line 2 (&quot;Topic | dropdown&quot;): the type must be text, textarea, select or phone, not &quot;dropdown&quot;')
-    // The typed text comes back for correction, not the empty parse result.
-    expect(html).toContain('Topic | dropdown</textarea>')
+  })
+
+  it('saves locations and questions from the row editor, and refills the rows as typed after an error', async () => {
+    const cookie = await seedSession(HOST_ID)
+    const csrf = await formCsrf(cookie)
+    const rows = {
+      loc_type_0: 'google_meet',
+      loc_type_1: 'in_person',
+      loc_value_1: '1385 Coral Way',
+      loc_label_1: 'MIK office',
+      q_label_0: 'Phone',
+      q_type_0: 'phone',
+      q_required_0: '1',
+    }
+
+    const bad = await post(
+      '/dashboard/event-types',
+      { title: 'Rows', slug: 'rows-bad', durationMinutes: '30', active: '1', csrf, ...rows, q_label_1: 'Topic', q_type_1: 'select' },
+      cookie,
+    )
+    expect(bad.status).toBe(400)
+    const badHtml = await bad.text()
+    expect(badHtml).toContain('Question 2: a dropdown needs its choices, separated by commas')
+    expect(badHtml).toContain('value="MIK office"')
+    expect(badHtml).toContain('name="q_label_1" maxlength="200" aria-label="Question" placeholder="e.g. Property address" value="Topic"')
+
+    const good = await post(
+      '/dashboard/event-types',
+      { title: 'Rows', slug: 'rows-good', durationMinutes: '30', active: '1', csrf, ...rows },
+      cookie,
+    )
+    expect(good.status).toBe(302)
+    const saved = (await env.DB.prepare('SELECT location_type, location_options_json, questions_json FROM event_types WHERE slug = ?')
+      .bind('rows-good')
+      .first()) as { location_type: string; location_options_json: string; questions_json: string }
+    expect(saved.location_type).toBe('google_meet')
+    expect(JSON.parse(saved.location_options_json)).toEqual([
+      { type: 'google_meet', value: null },
+      { type: 'in_person', value: '1385 Coral Way', label: 'MIK office' },
+    ])
+    expect(JSON.parse(saved.questions_json)).toEqual([{ id: 'phone', label: 'Phone', type: 'phone', required: true }])
   })
 })
 

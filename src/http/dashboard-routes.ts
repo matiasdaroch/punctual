@@ -122,6 +122,7 @@ import {
   loginPage,
   manageLinkErrorPage,
   parseOverrides,
+  parseQuestions,
   questionsParseError,
   parseWeeklyDraft,
   adminPage,
@@ -3677,12 +3678,21 @@ function readEventTypeForm(
   }
 
   const title = text('title')
-  // The questions now come from the row editor; the text form is gone, and
-  // an empty text always parses (validateEventType still reads it).
-  const questionsText = ''
   const optionsText: EventTypeOptionsText = { durations: text('durationOptions'), rows: readRows(form) }
+  // The row editor is the form now. A post with no rows at all is read the
+  // way the form used to post: one `locationType` / `locationValue`, and a
+  // `questions` box of `Label | type | required | options` lines — so a
+  // client or script built against the old form keeps working. No location
+  // at all means Google Meet, as it always has.
+  if (optionsText.rows.locations.length === 0) {
+    optionsText.rows.locations = [{ type: text('locationType') || 'google_meet', value: text('locationValue'), label: '' }]
+  }
+  const questionsText = optionsText.rows.questions.length === 0 ? String(form.get('questions') ?? '') : ''
   const parsedLocations = locationsFromRows(optionsText.rows.locations)
-  const parsedQuestions = questionsFromRows(optionsText.rows.questions)
+  const parsedQuestions =
+    questionsText.trim() !== ''
+      ? { questions: parseQuestions(questionsText) ?? [] }
+      : questionsFromRows(optionsText.rows.questions)
   const locations = 'options' in parsedLocations ? parsedLocations.options : []
   const first = locations[0] ?? { type: 'google_meet' as const, value: null }
   // Exactly one owner is ever set. The scheduling select is always rendered
