@@ -80,6 +80,7 @@ export async function notifyBookingCreated(ctx: NotifyContext): Promise<void> {
       organizer: { email: host.email, name: host.name || host.slug },
       attendees: [
         { email: booking.guestEmail, name: booking.guestName },
+        ...(booking.guests ?? []).map((g) => ({ email: g, name: g })),
         ...(ctx.hosts ?? [host]).map((h) => ({ email: h.email, name: h.name || h.slug })),
       ],
       ...(await invitationText(ports, booking, eventType, ctx.hosts ?? [host], manageUrl)),
@@ -135,6 +136,7 @@ export async function notifyBookingCreated(ctx: NotifyContext): Promise<void> {
         },
       })
       .catch((err) => console.error('[punctual] guest confirmation failed to queue', err)),
+    ...guestCopies(ports, booking, guest, attachments, 'confirmation'),
     ports.queue
       .send({
         kind: 'email',
@@ -205,6 +207,7 @@ export async function notifyWebhooks(
               description: describeLocation(used, booking.conferenceUrl),
             },
             conferenceUrl: booking.conferenceUrl,
+            guests: booking.guests ?? [],
             status: booking.status,
             rescheduleOf: booking.rescheduleOf,
             answers: booking.answers,
@@ -305,6 +308,7 @@ async function buildAttachment(
       organizer: { email: host.email, name: host.name || host.slug },
       attendees: [
         { email: booking.guestEmail, name: booking.guestName },
+        ...(booking.guests ?? []).map((g) => ({ email: g, name: g })),
         ...(hosts ?? [host]).map((h) => ({ email: h.email, name: h.name || h.slug })),
       ],
       ...(await invitationText(ports, booking, eventType, hosts ?? [host], method === 'CANCEL' ? undefined : url)),
@@ -400,6 +404,7 @@ export async function notifyBookingCancelled(ctx: {
         },
       })
       .catch((err) => console.error('[punctual] guest cancellation failed to queue', err)),
+    ...guestCopies(ports, booking, guest, attachments, 'cancellation'),
     ports.queue
       .send({
         kind: 'email',
@@ -479,6 +484,7 @@ export async function notifyBookingRescheduled(ctx: {
         },
       })
       .catch((err) => console.error('[punctual] guest reschedule mail failed to queue', err)),
+    ...guestCopies(ports, booking, guest, attachments, 'reschedule'),
     ports.queue
       .send({
         kind: 'email',
@@ -516,4 +522,26 @@ async function invitationText(
     hosts.map((user) => ({ user, optional: settings.get(user.id)?.required === false })),
   )
   return { summary: calendarTitle(eventType, participants), description: calendarDescription(eventType, booking, participants, manageUrl) }
+}
+
+/**
+ * The guest's email, sent again to each person they invited along, with the
+ * same invite attached. Separate sends, like the guest's and the host's, so
+ * one bad address cannot hold up the others.
+ */
+function guestCopies(
+  ports: EnginePorts,
+  booking: Booking,
+  mail: { subject: string; html: string; text: string },
+  attachments: Array<{ filename: string; content: string; contentType: string }> | undefined,
+  what: string,
+): Array<Promise<void>> {
+  return (booking.guests ?? []).map((to) =>
+    ports.queue
+      .send({
+        kind: 'email',
+        message: { to, subject: mail.subject, html: mail.html, text: mail.text, ...(attachments ? { attachments } : {}) },
+      })
+      .catch((err) => console.error(`[punctual] invited guest ${what} copy failed to queue`, err)),
+  )
 }

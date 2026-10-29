@@ -104,6 +104,12 @@ async function sendReminders(ports: EnginePorts, now: number): Promise<void> {
           text: mail.text,
         },
       })
+      // And to each person the guest invited along.
+      for (const to of booking.guests ?? []) {
+        await ports.queue
+          .send({ kind: 'email', message: { to, subject: mail.subject, html: mail.html, text: mail.text } })
+          .catch((err) => console.error('[punctual] invited guest reminder failed to queue', err))
+      }
     }
   }
 }

@@ -362,6 +362,8 @@ const eventTypeFields = {
     )
     .max(6),
   questions: z.array(questionSchema).max(20),
+  // Whether the booker may invite other people along (up to 10).
+  allowGuests: z.boolean(),
   active: z.boolean(),
   // Null = the owner's default schedule. Every event type POST /event-types
   // creates is personal (schedulingType is hardcoded 'personal' below), so
@@ -403,6 +405,7 @@ const eventTypeBody = z.object({
   durationOptions: eventTypeFields.durationOptions.default([]),
   locationOptions: eventTypeFields.locationOptions.default([]),
   questions: eventTypeFields.questions.default([]),
+  allowGuests: eventTypeFields.allowGuests.default(false),
   active: eventTypeFields.active.default(true),
   scheduleId: eventTypeFields.scheduleId.default(null),
 })
@@ -455,6 +458,8 @@ const bookingCreateBody = z.object({
       value: z.string().max(500).nullable().default(null),
     })
     .optional(),
+  // People to invite along, where the event type allows it.
+  guests: z.array(z.string().max(254).refine(isValidEmail, 'not a valid email address')).max(10).optional(),
 })
 
 const rescheduleBody = z.object({
@@ -627,6 +632,7 @@ export function buildApiRoutes(ports: EnginePorts, slots: SlotService): Hono<Api
       locationValue: body.locationOptions[0] ? body.locationOptions[0].value : body.locationValue,
       durationOptions: body.durationOptions,
       locationOptions: body.locationOptions,
+      allowGuests: body.allowGuests,
       questions: body.questions as EventTypeQuestion[],
       active: body.active,
       scheduleId: body.scheduleId,
@@ -1086,6 +1092,7 @@ export function buildApiRoutes(ports: EnginePorts, slots: SlotService): Hono<Api
       guestTimezone: body.guestTimezone ?? user.tz,
       answers: declaredAnswers,
       ...(body.location ? { location: apiLocation(eventType, body.location, declaredAnswers) } : {}),
+      ...(body.guests && body.guests.length > 0 ? { guests: [...new Set(body.guests.map((g) => g.toLowerCase()))] } : {}),
       // Passed straight through: the coordinator owns deduplication (ADR-0002
       // §4), so a retried POST returns the booking it already made instead of
       // making a second one.
@@ -1470,6 +1477,7 @@ export function eventTypeJson(
     locationValue: et.locationValue,
     durationOptions: durationChoices(et),
     locationOptions: locationChoices(et),
+    allowGuests: et.allowGuests ?? false,
     // Effective, not declared — same reasoning as the MCP listing: a client
     // rendering a booking form from this resource can only ask questions it
     // can see, and POST /bookings already validates an `agenda` answer. The
@@ -1510,6 +1518,7 @@ export function bookingJson(booking: Booking): Record<string, unknown> {
     // The location the guest chose; null = the event type's default.
     location: booking.locationType ? { type: booking.locationType, value: booking.locationValue ?? null } : null,
     conferenceUrl: booking.conferenceUrl,
+    guests: booking.guests ?? [],
     answers: booking.answers,
     rescheduleOf: booking.rescheduleOf,
     rescheduledTo: booking.rescheduledTo,

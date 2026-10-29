@@ -100,6 +100,8 @@ export const eventTypes = sqliteTable(
     // Further durations and locations a guest may pick (migration 0018).
     durationOptionsJson: text('duration_options_json').notNull().default('[]'),
     locationOptionsJson: text('location_options_json').notNull().default('[]'),
+    // Whether the booker may invite others (migration 0020).
+    allowGuests: integer('allow_guests').notNull().default(0),
     questionsJson: text('questions_json').notNull().default('[]'),
     active: integer('active').notNull().default(1),
     createdAt: integer('created_at').notNull(),
@@ -228,6 +230,8 @@ export const bookings = sqliteTable(
     // The guest's chosen location; null = the event type's (migration 0018).
     locationType: text('location_type'),
     locationValue: text('location_value'),
+    // The booker's invited guests (migration 0020).
+    guestsJson: text('guests_json').notNull().default('[]'),
     // Claimed by the calendar-sync handler to make the confirmation send
     // exactly-once across queue retries.
     confirmationQueuedAt: integer('confirmation_queued_at'),

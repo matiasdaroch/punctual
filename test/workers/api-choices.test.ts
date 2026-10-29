@@ -92,12 +92,14 @@ describe('duration and location through the API', () => {
           { type: 'in_person', value: '1385 Coral Way', label: 'MIK office' },
         ],
         questions: [{ id: 'phone', label: 'Phone', type: 'phone', required: true }],
+        allowGuests: true,
       }),
     })
     expect(created.status, await created.clone().text()).toBe(201)
     const et = ((await created.json()) as { data: Record<string, unknown> }).data
     expect(et['durationOptions']).toEqual([30, 45, 60])
     expect(et['locationType']).toBe('google_meet')
+    expect(et['allowGuests']).toBe(true)
     expect((et['locationOptions'] as unknown[]).length).toBe(3)
 
     await app.request('/api/v1/webhooks', {
@@ -120,12 +122,14 @@ describe('duration and location through the API', () => {
         answers: { phone: '+1 786 708 0880' },
         durationMinutes: 60,
         location: { type: 'phone' },
+        guests: ['Partner@Choices.test'],
       }),
     })
     expect(booked.status).toBe(201)
     const booking = ((await booked.json()) as { data: Record<string, unknown> }).data
     expect(booking['durationMinutes']).toBe(60)
     expect(booking['location']).toEqual({ type: 'phone', value: '+1 786 708 0880' })
+    expect(booking['guests']).toEqual(['partner@choices.test'])
 
     // A length the event type does not offer is refused, not stretched.
     const odd = await app.request('/api/v1/bookings', {
@@ -153,7 +157,11 @@ describe('duration and location through the API', () => {
       durationMinutes: 60,
       location: { type: 'phone', value: '+1 786 708 0880', description: 'Phone: +1 786 708 0880' },
       answers: { phone: '+1 786 708 0880' },
+      guests: ['partner@choices.test'],
     })
+    // The invited guest gets their own copy of the confirmation.
+    const mails = queued.filter((m): m is Extract<QueueMessage, { kind: 'email' }> => m.kind === 'email')
+    expect(mails.map((m) => m.message.to)).toContain('partner@choices.test')
   })
 })
 

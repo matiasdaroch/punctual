@@ -22,6 +22,7 @@ import type { CompanyLogo,
 import { effectiveQuestions } from '../../core/domain/booking-service.js'
 import { CALLING_CODES, joinPhone, splitPhone } from '../../core/domain/phone.js'
 import {
+  MAX_GUESTS,
   durationChoices,
   guestFieldLabel,
   guestSupplies,
@@ -473,6 +474,16 @@ function phoneField(name: string, id: string, value: string, attrs: string): str
         </span>`
 }
 
+/** "Add guests", on an event type that allows them: addresses, separated by commas or lines. */
+function guestsField(errors: Record<string, string>, values: Record<string, string>): string {
+  const err = errors['guests']
+  return `<label for="guests">Add guests <span class="pu-muted">(optional)</span></label>
+    <textarea id="guests" name="guests" rows="2" placeholder="name@example.com, another@example.com"
+              autocomplete="off"${err ? ' aria-describedby="err-guests"' : ''}>${escapeHtml(values['guests'] ?? '')}</textarea>
+    ${err ? `<p class="pu-err" id="err-guests">${escapeHtml(err)}</p>` : ''}
+    <p class="pu-help">Up to ${MAX_GUESTS} email addresses. They get the invitation too.</p>`
+}
+
 /** A phone field's value as last posted, country and number joined, for refilling it. */
 function typedPhone(values: Record<string, string>, field: string): string {
   const iso = values[`${field}__country`]
@@ -837,6 +848,7 @@ export function confirmForm(
     ${errors['email'] ? `<p class="pu-err" id="err-email">${escapeHtml(errors['email'])}</p>` : ''}
     ${locationFieldset(d, errors, values)}
     ${questions}
+    ${et.allowGuests ? guestsField(errors, values) : ''}
     <div style="margin-top:1.25rem;display:flex;gap:.75rem;flex-wrap:wrap">
       <button class="pu-btn" type="submit">Confirm booking</button>
       <a class="pu-btn pu-btn-ghost" href="${escapeHtml(bookingPath(d))}?date=${escapeHtml(localDateString(start, d.guestTimezone))}${d.embed ? '&embed=1' : ''}${escapeHtml(choiceQuery(d))}">Back</a>

@@ -199,3 +199,25 @@ export function parseDurationOptions(text: string): number[] | null {
   }
   return [...new Set(out)].sort((a, b) => a - b)
 }
+
+export const MAX_GUESTS = 10
+
+/**
+ * The "add guests" field: email addresses separated by commas, spaces,
+ * semicolons or lines, lowercased and deduplicated, the booker's own address
+ * dropped. The message for the first one that is not an address.
+ */
+export function parseGuests(text: string, bookerEmail = ''): { guests: string[] } | { error: string } {
+  const booker = bookerEmail.trim().toLowerCase()
+  const guests: string[] = []
+  for (const raw of text.split(/[\s,;]+/)) {
+    const email = raw.trim().toLowerCase()
+    if (email === '' || email === booker || guests.includes(email)) continue
+    if (email.length > 254 || !/^[^\s@]+@[^\s@.]+(\.[^\s@.]+)+$/.test(email)) {
+      return { error: `"${raw.trim()}" is not an email address` }
+    }
+    guests.push(email)
+  }
+  if (guests.length > MAX_GUESTS) return { error: `Up to ${MAX_GUESTS} guests` }
+  return { guests }
+}

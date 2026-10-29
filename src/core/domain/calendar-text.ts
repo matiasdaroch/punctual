@@ -17,7 +17,7 @@ export interface Participant {
   email: string
   company: string | null
   jobTitle: string | null
-  role: 'guest' | 'host' | 'optional host'
+  role: 'guest' | 'invited guest' | 'host' | 'optional host'
 }
 
 /**
@@ -83,6 +83,13 @@ export function participantsFor(
   }
   return [
     guest,
+    ...(booking.guests ?? []).map((email) => ({
+      name: email,
+      email,
+      company: null,
+      jobTitle: null,
+      role: 'invited guest' as const,
+    })),
     ...hosts.map((h) => ({
       name: h.user.name || h.user.slug,
       email: h.user.email,

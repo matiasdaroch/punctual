@@ -835,6 +835,11 @@ export interface BookingAttempt {
    * original booking's choice.
    */
   location?: LocationOption
+  /**
+   * People the guest invites along, when the event type allows it. Absent:
+   * none, or on a reschedule the original booking's.
+   */
+  guests?: string[]
 }
 
 export type BookingOutcome =

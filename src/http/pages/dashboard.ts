@@ -958,6 +958,12 @@ ${
       <template id="q-row-template">${questionRowHtml(BLANK_QUESTION_ROW, '__i__')}</template>
       <button type="button" class="pu-btn pu-btn-ghost pu-row-add" data-rows="q-rows" data-template="q-row-template">Add question</button>
       ${fieldError('questions', errors)}
+      <label for="allowGuests" style="display:flex;align-items:center;gap:.5rem;margin-top:1rem">
+        <input id="allowGuests" name="allowGuests" type="checkbox" value="1" style="width:auto"
+               ${et?.allowGuests ? 'checked' : ''}>
+        <span>Let guests invite other people (up to 10)</span>
+      </label>
+      <p class="pu-help">They get the calendar invite and the emails too.</p>
     </fieldset>
     <script>${ROW_EDITOR_SCRIPT}</script>
 

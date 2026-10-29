@@ -17,6 +17,7 @@ import type {
 import type { Booking, EventType, LocationOption } from '../core/domain/types.js'
 import { combineBusy, partitionConnections, prepareBooking } from '../core/domain/booking-service.js'
 import {
+  MAX_GUESTS,
   durationChoices,
   guestSupplies,
   locationChoices,
@@ -200,6 +201,7 @@ export function createCoordinator(deps: CoordinatorDeps): HostCoordinator {
           manageTokenHash,
           rescheduleOf: request.rescheduleOf ?? null,
           location: chosen.location,
+          guests: chosen.guests,
           rrContext,
           expectedHostCount: requiredCount,
         })
@@ -405,7 +407,7 @@ export function createCoordinator(deps: CoordinatorDeps): HostCoordinator {
 }
 
 type ChoiceResult =
-  | { ok: true; eventType: EventType; location: LocationOption | null }
+  | { ok: true; eventType: EventType; location: LocationOption | null; guests: string[] }
   | { ok: false; detail: string }
 
 /**
@@ -442,9 +444,16 @@ async function applyChoices(repos: Repositories, base: EventType, request: Booki
     } else return { ok: false, detail: 'that location is not offered' }
   }
 
+  // Invited guests: only where the event type allows them, and a reschedule
+  // keeps the original's unless the caller names new ones.
+  if (request.guests && request.guests.length > 0 && !base.allowGuests) {
+    return { ok: false, detail: 'this event type does not take guests' }
+  }
+  const guests = (request.guests ?? original?.guests ?? []).slice(0, MAX_GUESTS)
+
   let eventType = withDuration(base, minutes)
   if (location) eventType = withLocation(eventType, location)
-  return { ok: true, eventType, location }
+  return { ok: true, eventType, location, guests }
 }
 
 /**

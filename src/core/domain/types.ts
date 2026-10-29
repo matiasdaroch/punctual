@@ -166,6 +166,8 @@ export interface EventType {
    * readers). Empty or absent: the default only (migration 0019).
    */
   locationOptions?: LocationOption[]
+  /** Whether the booker may invite other people along (migration 0020). Absent: no. */
+  allowGuests?: boolean
   questions: EventTypeQuestion[]
   /**
    * The event type's own logo (a thumbnail blob key, same convention as
@@ -285,6 +287,8 @@ export interface Booking {
    */
   locationType?: LocationType | null
   locationValue?: string | null
+  /** Email addresses the booker invited along; they get the invite and the emails too. */
+  guests?: string[]
   rescheduleOf: string | null
   rescheduledTo: string | null
   /** Rotated on reschedule so links in superseded emails die (ADR-0005 §4). */

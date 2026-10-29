@@ -475,6 +475,8 @@ async function planInvites(
       seen.add(key)
       attendees.push({ email, name, ...(optional ? { optional: true } : {}) })
     }
+    // The people the guest invited along sit beside the guest.
+    for (const g of booking.guests ?? []) add(g, g, false)
     for (const h of hosts) {
       const optional = settings.get(h.user.id)?.required === false
       const onThisProvider = h.writable.filter((c) => c.provider === provider)
@@ -489,6 +491,7 @@ async function planInvites(
     organizerTz.set(conn.id, organizer.user.tz)
   })
   const currentAttendees: ExternalEvent['attendees'] = [{ email: booking.guestEmail, name: booking.guestName }]
+  for (const g of booking.guests ?? []) currentAttendees.push({ email: g, name: g })
   for (const h of hosts) {
     const optional = settings.get(h.user.id)?.required === false
     if (h.user.email && h.user.email.toLowerCase() !== booking.guestEmail.toLowerCase()) {
@@ -507,6 +510,7 @@ async function legacyAttendees(
   const host = await repos.users.byId(conn.userId)
   return [
     { email: booking.guestEmail, name: booking.guestName },
+    ...(booking.guests ?? []).map((g) => ({ email: g, name: g })),
     ...(host ? [{ email: host.email, name: host.name || host.slug }] : []),
   ]
 }

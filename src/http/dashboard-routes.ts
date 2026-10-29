@@ -3768,6 +3768,7 @@ function readEventTypeForm(
     durationOptions: parseDurationOptions(optionsText.durations) ?? [],
     locationOptions: locations.length > 1 || locations.some((o) => o.label) ? locations : [],
     questions: 'questions' in parsedQuestions ? parsedQuestions.questions : [],
+    allowGuests: form.get('allowGuests') !== null,
     active: form.get('active') !== null,
     createdAt: 0,
     // Same reasoning as `schedulingType` above: the select always renders,

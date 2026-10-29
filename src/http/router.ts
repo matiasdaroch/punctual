@@ -35,6 +35,7 @@ import {
   forBooking,
   guestSupplies,
   locationChoices,
+  parseGuests,
   pickDuration,
   pickLocation,
   withDuration,
@@ -604,6 +605,9 @@ export function buildRouter(ports: EnginePorts, slots: SlotService): Hono<{ Bind
     if (!isValidEmail(email)) errors['email'] = 'Please enter a valid email address'
     const located = readLocation(ctx.eventType, form, declared)
     if ('error' in located) errors[located.field] ??= located.error
+    const guestsText = String(form.get('guests') ?? '')
+    const invited = ctx.eventType.allowGuests ? parseGuests(guestsText, email) : { guests: [] }
+    if ('error' in invited) errors['guests'] = invited.error
 
     if (Object.keys(errors).length > 0) {
       return c.html(
@@ -614,7 +618,7 @@ export function buildRouter(ports: EnginePorts, slots: SlotService): Hono<{ Bind
           // effective question has a different id needs to reappear under
           // THAT id, or confirmForm's `values[q.id]` lookup renders it as
           // empty and the guest's typed text looks lost on the error page.
-          confirmForm(data, start, { errors, values: { name, email, ...declared, ...locationFormValues(form) }, holdId }) +
+          confirmForm(data, start, { errors, values: { name, email, ...declared, ...locationFormValues(form), guests: guestsText }, holdId }) +
           shellFoot(true, embed, displayCompany(data)),
         400,
       )
@@ -633,6 +637,7 @@ export function buildRouter(ports: EnginePorts, slots: SlotService): Hono<{ Bind
       holdId,
       idempotencyKey: c.req.header('idempotency-key') ?? undefined,
       ...('location' in located && located.location ? { location: located.location } : {}),
+      ...('guests' in invited && invited.guests.length > 0 ? { guests: invited.guests } : {}),
     })
 
     if (!outcome.ok) {

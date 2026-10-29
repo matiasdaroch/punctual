@@ -50,6 +50,7 @@ describe('phone-call location', () => {
       eventType('et_phone_q', 'with-question', [{ id: 'phone', label: 'Phone', type: 'phone', required: false }]),
       eventType('et_phone_none', 'no-question', []),
     ])
+    await env.DB.prepare("UPDATE event_types SET allow_guests = 1 WHERE id = 'et_phone_none'").run()
   })
 
   it('does not ask for the number twice when the form has a phone question', async () => {
@@ -94,5 +95,31 @@ describe('phone-call location', () => {
     const html = await res.text()
     expect(html).toContain('Please enter a valid phone number')
     expect(html).toContain('<option value="CO" selected>Colombia +57</option>')
+  })
+})
+
+describe('invited guests on the booking form', () => {
+  const start = Date.UTC(2031, 0, 15, 15, 0)
+
+  it('offers the field only where the event type allows guests', async () => {
+    const allowed = await (await fetchPage(`/phone-host/no-question/confirm?start=${start}&tz=UTC`)).text()
+    expect(allowed).toContain('<textarea id="guests" name="guests"')
+    const notAllowed = await (await fetchPage(`/phone-host/with-question/confirm?start=${start}&tz=UTC`)).text()
+    expect(notAllowed).not.toContain('name="guests"')
+  })
+
+  it('names the address that is not one and keeps what was typed', async () => {
+    const res = await post('/phone-host/no-question/confirm', {
+      start: String(start),
+      tz: 'UTC',
+      name: 'Guest',
+      email: 'guest@example.com',
+      location: '1',
+      guests: 'ok@example.com, not-an-address',
+    })
+    expect(res.status).toBe(400)
+    const html = await res.text()
+    expect(html).toContain('&quot;not-an-address&quot; is not an email address')
+    expect(html).toContain('ok@example.com, not-an-address</textarea>')
   })
 })

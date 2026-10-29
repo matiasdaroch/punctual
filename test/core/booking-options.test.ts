@@ -146,3 +146,13 @@ describe('dashboard text', () => {
     expect(parseDurationOptions('an hour')).toBeNull()
   })
 })
+
+describe('invited guests', () => {
+  it('reads addresses separated by commas or lines, without the booker or repeats', async () => {
+    const { parseGuests } = await import('../../src/core/domain/booking-options.js')
+    expect(parseGuests('A@x.com, b@y.com\nme@z.com; a@x.com', 'Me@z.com')).toEqual({ guests: ['a@x.com', 'b@y.com'] })
+    expect(parseGuests('')).toEqual({ guests: [] })
+    expect(parseGuests('nope')).toEqual({ error: '"nope" is not an email address' })
+    expect(parseGuests(Array.from({ length: 11 }, (_, i) => `g${i}@x.com`).join(','))).toEqual({ error: 'Up to 10 guests' })
+  })
+})

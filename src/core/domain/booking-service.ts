@@ -55,6 +55,8 @@ export interface BookingRequest {
   rescheduleOf?: string | null
   /** The guest's chosen location, stored on the booking; null = the event type's. */
   location?: LocationOption | null
+  /** The people the guest invited along. */
+  guests?: string[]
   /** Round-robin ordering input: teamId + last-assigned times. */
   rrContext?: { teamId: string; members: TeamMember[]; lastAssignedAt: Map<string, number> }
 }
@@ -226,6 +228,7 @@ export function prepareBooking(req: BookingRequest): BookingResult {
     conferenceUrl: null,
     locationType: req.location?.type ?? null,
     locationValue: req.location ? req.location.value : null,
+    guests: req.guests ?? [],
     rescheduleOf: req.rescheduleOf ?? null,
     rescheduledTo: null,
     manageTokenHash: req.manageTokenHash,
