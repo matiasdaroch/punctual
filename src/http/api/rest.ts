@@ -19,7 +19,7 @@
  * payloads should not point at our domain.
  */
 
-import { forBooking } from '../../core/domain/booking-options.js'
+import { durationChoices, forBooking, locationChoices } from '../../core/domain/booking-options.js'
 import { Hono } from 'hono'
 import { z } from 'zod'
 import type {
@@ -28,6 +28,7 @@ import type {
   Booking,
   EventType,
   EventTypeQuestion,
+  LocationOption,
   Schedule,
   Interval,
   Slot,
@@ -346,6 +347,20 @@ const eventTypeFields = {
   maxPerDay: z.number().int().min(1).max(100).nullable(),
   locationType: z.enum(['google_meet', 'custom_link', 'phone', 'in_person']),
   locationValue: z.string().max(500).nullable(),
+  // Further lengths a guest may pick, besides durationMinutes (core/domain/booking-options.ts).
+  durationOptions: z.array(z.number().int().min(5).max(1440).multipleOf(5)).max(8),
+  // Every location a guest may pick, the default first; when given, the
+  // first one also becomes locationType / locationValue. A phone or
+  // in-person option with a null value is one the guest fills in.
+  locationOptions: z
+    .array(
+      z.object({
+        type: z.enum(['google_meet', 'custom_link', 'phone', 'in_person']),
+        value: z.string().max(500).nullable(),
+        label: z.string().max(80).nullable().optional(),
+      }),
+    )
+    .max(6),
   questions: z.array(questionSchema).max(20),
   active: z.boolean(),
   // Null = the owner's default schedule. Every event type POST /event-types
@@ -385,6 +400,8 @@ const eventTypeBody = z.object({
   maxPerDay: eventTypeFields.maxPerDay.default(null),
   locationType: eventTypeFields.locationType.default('google_meet'),
   locationValue: eventTypeFields.locationValue.default(null),
+  durationOptions: eventTypeFields.durationOptions.default([]),
+  locationOptions: eventTypeFields.locationOptions.default([]),
   questions: eventTypeFields.questions.default([]),
   active: eventTypeFields.active.default(true),
   scheduleId: eventTypeFields.scheduleId.default(null),
@@ -427,6 +444,17 @@ const bookingCreateBody = z.object({
   guestEmail: z.string().max(254).refine(isValidEmail, 'not a valid email address'),
   guestTimezone: z.string().refine(isValidTimeZone, 'not an IANA timezone').optional(),
   answers: z.record(z.string(), z.string().max(2000)).default({}),
+  // One of the event type's lengths; absent = its default.
+  durationMinutes: z.number().int().min(5).max(1440).multipleOf(5).optional(),
+  // One of the event type's locations, as `locationOptions` lists it. For one
+  // the guest fills in, `value` is their number or address; a phone call
+  // with no value dials the answer to the event type's phone question.
+  location: z
+    .object({
+      type: z.enum(['google_meet', 'custom_link', 'phone', 'in_person']),
+      value: z.string().max(500).nullable().default(null),
+    })
+    .optional(),
 })
 
 const rescheduleBody = z.object({
@@ -595,8 +623,10 @@ export function buildApiRoutes(ports: EnginePorts, slots: SlotService): Hono<Api
       minNoticeMinutes: body.minNoticeMinutes,
       maxHorizonDays: body.maxHorizonDays,
       maxPerDay: body.maxPerDay,
-      locationType: body.locationType,
-      locationValue: body.locationValue,
+      locationType: body.locationOptions[0]?.type ?? body.locationType,
+      locationValue: body.locationOptions[0] ? body.locationOptions[0].value : body.locationValue,
+      durationOptions: body.durationOptions,
+      locationOptions: body.locationOptions,
       questions: body.questions as EventTypeQuestion[],
       active: body.active,
       scheduleId: body.scheduleId,
@@ -709,6 +739,9 @@ export function buildApiRoutes(ports: EnginePorts, slots: SlotService): Hono<Api
     }
     const before = hosts !== undefined ? await currentHostIds(repos, et) : new Set<string>()
 
+    // A new location list carries its own default, as on create.
+    const firstLocation = (fields as { locationOptions?: Array<{ type: EventType['locationType']; value: string | null }> }).locationOptions?.[0]
+    if (firstLocation) Object.assign(fields, { locationType: firstLocation.type, locationValue: firstLocation.value })
     if (Object.keys(fields).length > 0) await repos.eventTypes.update(id, fields as Partial<EventType>)
     if (hosts !== undefined && et.ownerTeamId) {
       // Atomic, SQL-guarded replace — same as the dashboard's Hosts block.
@@ -1047,11 +1080,12 @@ export function buildApiRoutes(ports: EnginePorts, slots: SlotService): Hono<Api
       eventTypeId: eventType.id,
       hostUserIds: hostUsers.map((u) => u.id),
       start,
-      end: start + eventType.durationMinutes * 60_000,
+      end: start + (body.durationMinutes ?? eventType.durationMinutes) * 60_000,
       guestName: body.guestName,
       guestEmail: body.guestEmail,
       guestTimezone: body.guestTimezone ?? user.tz,
       answers: declaredAnswers,
+      ...(body.location ? { location: apiLocation(eventType, body.location, declaredAnswers) } : {}),
       // Passed straight through: the coordinator owns deduplication (ADR-0002
       // §4), so a retried POST returns the booking it already made instead of
       // making a second one.
@@ -1434,6 +1468,8 @@ export function eventTypeJson(
     maxPerDay: et.maxPerDay,
     locationType: et.locationType,
     locationValue: et.locationValue,
+    durationOptions: durationChoices(et),
+    locationOptions: locationChoices(et),
     // Effective, not declared — same reasoning as the MCP listing: a client
     // rendering a booking form from this resource can only ask questions it
     // can see, and POST /bookings already validates an `agenda` answer. The
@@ -1470,6 +1506,10 @@ export function bookingJson(booking: Booking): Record<string, unknown> {
     end: instantJson(booking.endUtc),
     localDate: booking.localDate,
     status: booking.status,
+    durationMinutes: Math.round((booking.endUtc - booking.startUtc) / 60_000),
+    // The location the guest chose; null = the event type's default.
+    location: booking.locationType ? { type: booking.locationType, value: booking.locationValue ?? null } : null,
+    conferenceUrl: booking.conferenceUrl,
     answers: booking.answers,
     rescheduleOf: booking.rescheduleOf,
     rescheduledTo: booking.rescheduledTo,
@@ -1500,4 +1540,22 @@ export function webhookJson(webhook: Webhook): Record<string, unknown> {
 
 function trimSlash(url: string): string {
   return url.endsWith('/') ? url.slice(0, -1) : url
+}
+
+/**
+ * The location a POST /bookings asked for, as the coordinator checks it
+ * (adapters/coordinator.ts): a phone call with no number dials the answer to
+ * the event type's own phone question, as the booking form does.
+ */
+function apiLocation(
+  et: EventType,
+  asked: { type: EventType['locationType']; value: string | null },
+  answers: Record<string, string>,
+): LocationOption {
+  if (asked.type === 'phone' && !asked.value) {
+    const question = effectiveQuestions(et).find((q) => q.type === 'phone')
+    const number = question ? answers[question.id] : undefined
+    if (number) return { type: 'phone', value: number }
+  }
+  return { type: asked.type, value: asked.value }
 }

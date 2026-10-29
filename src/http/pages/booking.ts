@@ -852,6 +852,9 @@ export function bookedConfirmation(opts: {
   guestTimezone: string
   manageUrl: string
   locationLabel?: string
+  /** For the add-to-calendar buttons. Absent: no buttons. */
+  calendar?: AddToCalendar
+  brandName?: string
 }): string {
   const when = formatInZone(opts.start, opts.guestTimezone, {
     weekday: 'long',
@@ -861,11 +864,7 @@ export function bookedConfirmation(opts: {
     minute: '2-digit',
   })
   return `<section class="pu-card pu-confirm" aria-label="Booking confirmed">
-  <svg class="pu-confirm-icon" width="56" height="56" viewBox="0 0 96 96" aria-hidden="true">
-    <path class="pu-ring-arc" d="M 69.2 30.8 A 30 30 0 1 1 26.8 30.8"
-      fill="none" stroke-width="9" stroke-linecap="round"></path>
-    <circle class="pu-ring-dot" cx="48" cy="22" r="11"></circle>
-  </svg>
+  <div class="pu-confirm-logo">${brandLogoHtml('/', opts.brandName ?? 'MIK Architecture')}</div>
   <p><span class="pu-badge">Confirmed</span></p>
   <h1>You're booked</h1>
   <p class="pu-muted"><strong style="color:var(--pu-ink-950)">${escapeHtml(opts.eventTitle)}</strong> with ${escapeHtml(opts.hostName)}</p>
@@ -875,10 +874,67 @@ export function bookedConfirmation(opts: {
     ${opts.locationLabel ? `<div><dt>Where</dt><dd>${escapeHtml(opts.locationLabel)}</dd></div>` : ''}
   </dl>
   <p class="pu-muted">A calendar invitation is on its way to your inbox.</p>
+  ${opts.calendar ? addToCalendarHtml(opts.calendar) : ''}
   <p style="margin-top:1.25rem">
     <a class="pu-btn pu-btn-ghost" href="${escapeHtml(opts.manageUrl)}">Reschedule or cancel</a>
   </p>
 </section>`
+}
+
+/** What the add-to-calendar buttons put in the guest's own calendar. */
+export interface AddToCalendar {
+  title: string
+  start: number
+  end: number
+  location: string
+  details: string
+  /** The booking's .ics, for Apple Calendar and anything else that opens one. */
+  icsUrl: string
+}
+
+/** `20261030T170000Z`, the form Google's template link takes. */
+function compactUtc(ms: number): string {
+  return new Date(ms).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
+}
+
+/**
+ * One button per calendar the guest is likely to use: Google and the two
+ * Outlooks open a prefilled "new event" page; Apple (and anything else)
+ * gets the .ics, which every calendar app opens.
+ */
+export function addToCalendarHtml(e: AddToCalendar): string {
+  const google =
+    'https://calendar.google.com/calendar/render?' +
+    new URLSearchParams({
+      action: 'TEMPLATE',
+      text: e.title,
+      dates: `${compactUtc(e.start)}/${compactUtc(e.end)}`,
+      details: e.details,
+      location: e.location,
+    }).toString()
+  const outlook = (host: string) =>
+    `https://${host}/calendar/0/action/compose?` +
+    new URLSearchParams({
+      path: '/calendar/action/compose',
+      rru: 'addevent',
+      subject: e.title,
+      startdt: new Date(e.start).toISOString(),
+      enddt: new Date(e.end).toISOString(),
+      body: e.details,
+      location: e.location,
+    }).toString()
+  const link = (href: string, label: string, extra = '') =>
+    `<a class="pu-btn pu-btn-ghost pu-cal-btn" href="${escapeHtml(href)}"${extra}>${label}</a>`
+  const external = ' target="_blank" rel="noopener"'
+  return `<div class="pu-add-cal">
+    <p class="pu-muted">Add it to your calendar</p>
+    <div class="pu-add-cal-btns">
+      ${link(google, 'Google', external)}
+      ${link(outlook('outlook.live.com'), 'Outlook', external)}
+      ${link(outlook('outlook.office.com'), 'Microsoft 365', external)}
+      ${link(e.icsUrl, 'Apple / other (.ics)', ' download')}
+    </div>
+  </div>`
 }
 
 /**

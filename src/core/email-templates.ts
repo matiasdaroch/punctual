@@ -73,7 +73,6 @@ export interface BookingEmailContext {
 // custom properties, so every colour has to travel with the element.
 const INK = '#221F1F'
 const MUTED = '#3F413E'
-const PAPER = '#F7F5F1'
 const PAPER_DIM = '#EEEBE5'
 const LINE = '#E0DCD4'
 const MERIDIAN = '#46736E'
@@ -246,13 +245,13 @@ function shell(input: ShellInput): string {
     `<meta http-equiv="X-UA-Compatible" content="IE=edge">` +
     `<meta name="color-scheme" content="light">` +
     `<meta name="supported-color-schemes" content="light">` +
-    `</head><body style="margin:0;padding:0;background-color:${PAPER};" bgcolor="${PAPER}">` +
+    `</head><body style="margin:0;padding:0;background-color:#FFFFFF;" bgcolor="#FFFFFF">` +
     // Hidden preheader: what the inbox shows next to the subject. Without it,
     // clients scrape the first visible text, which here is the wordmark.
     `<div style="display:none;max-height:0;overflow:hidden;opacity:0;">${escapeHtml(input.preheader)}</div>` +
-    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:${PAPER};margin:0;padding:0;">` +
+    `<table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" style="background-color:#FFFFFF;margin:0;padding:0;">` +
     `<tr><td align="center" style="padding:24px 12px;">` +
-    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="width:100%;max-width:600px;background-color:#FFFFFF;border:1px solid ${LINE};border-radius:2px;">` +
+    `<table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" style="width:100%;max-width:600px;background-color:#FFFFFF;">` +
     // Wordmark as text, not an image: images are blocked by default in Outlook
     // and Gmail, and a confirmation must not open on a broken placeholder.
     `<tr><td style="padding:24px 28px 8px 28px;color:${INK};">` +

@@ -29,6 +29,7 @@
  *     each write.
  */
 
+import { buildIcs, icsUidForBooking } from '../core/ics.js'
 import { MAX_DURATION_OPTIONS, forBooking, parseDurationOptions } from '../core/domain/booking-options.js'
 import {
   locationsFromRows,
@@ -3212,6 +3213,45 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
   // ===========================================================================
   // Guest manage page — authenticated by the manage token, never by a session
   // ===========================================================================
+
+  /**
+   * The booking as an .ics file, for the confirmation page's "Apple / other"
+   * button. Behind the same manage link as the page itself: it names the
+   * guest and the hosts. The UID matches the emailed invite's, so opening
+   * both updates one event rather than adding two.
+   */
+  app.get('/booking/:id/invite.ics', async (c) => {
+    const verified = await verifyManageLink(c.req.query('token') ?? '', c.req.param('id') ?? '')
+    if (!verified.ok) return manageError(c, verified.message)
+    const { booking } = verified
+    const repos = ports.repositories(guestScope())
+    const eventType = forBooking(await repos.eventTypes.byId(booking.eventTypeId), booking)
+    const host = await repos.users.byId(booking.hostUserId)
+    if (!eventType || !host) return manageError(c, 'This booking is no longer available.')
+    const hosts = (await Promise.all([...attendingIds(booking)].map((id) => repos.users.byId(id)))).filter(
+      (u): u is User => u !== null,
+    )
+    const manageUrl = `${ports.config.baseUrl}/booking/${booking.id}?token=${encodeURIComponent(c.req.query('token') ?? '')}`
+    const ics = buildIcs({
+      uid: icsUidForBooking(booking, new Map()),
+      sequence: 0,
+      method: 'REQUEST',
+      booking,
+      eventType,
+      organizer: { email: host.email, name: host.name || host.slug },
+      attendees: [
+        { email: booking.guestEmail, name: booking.guestName },
+        ...(hosts.length > 0 ? hosts : [host]).map((h) => ({ email: h.email, name: h.name || h.slug })),
+      ],
+      description: [eventType.description.trim(), `Reschedule or cancel: ${manageUrl}`].filter(Boolean).join('\n\n'),
+      url: manageUrl,
+    })
+    return c.body(ics, 200, {
+      'content-type': 'text/calendar; charset=utf-8',
+      'content-disposition': 'attachment; filename="invite.ics"',
+      'cache-control': 'private, no-store',
+    })
+  })
 
   app.get('/booking/:id', async (c) => {
     const token = c.req.query('token') ?? ''

@@ -656,23 +656,40 @@ export function buildRouter(ports: EnginePorts, slots: SlotService): Hono<{ Bind
     const manageUrl =
       `${ports.config.baseUrl}/booking/${outcome.booking.id}` +
       (outcome.manageToken ? `?token=${encodeURIComponent(outcome.manageToken)}` : '')
+    // Who actually attends — the round-robin pick, or the required hosts
+    // plus the optional ones that were free — not the page's representative
+    // member.
+    const hostName =
+      joinNames(
+        outcome.booking.hostUserIds
+          .map((id) => hostUsers.find((u) => u.id === id))
+          .filter((u): u is User => u !== undefined)
+          .map((u) => u.name || u.slug),
+      ) || host.name || host.slug
+    const used = forBooking(ctx.eventType, outcome.booking)
+    const where = describeLocation(used, outcome.booking.conferenceUrl)
     return c.html(
       shellHead({ title: 'Booked', brandName: ports.config.brandName }) +
         bookedConfirmation({
           eventTitle: eventType.title,
-          // Who actually attends — the round-robin pick, or the required
-          // hosts plus the optional ones that were free — not the page's
-          // representative member.
-          hostName: joinNames(
-            outcome.booking.hostUserIds
-              .map((id) => hostUsers.find((u) => u.id === id))
-              .filter((u): u is User => u !== undefined)
-              .map((u) => u.name || u.slug),
-          ) || host.name || host.slug,
+          hostName,
           start: outcome.booking.startUtc,
           guestTimezone,
           manageUrl,
-          locationLabel: describeLocation(forBooking(ctx.eventType, outcome.booking), outcome.booking.conferenceUrl),
+          locationLabel: where,
+          brandName: ports.config.brandName,
+          ...(outcome.manageToken
+            ? {
+                calendar: {
+                  title: `${eventType.title} with ${hostName}`,
+                  start: outcome.booking.startUtc,
+                  end: outcome.booking.endUtc,
+                  location: where,
+                  details: [used.description.trim(), `Reschedule or cancel: ${manageUrl}`].filter(Boolean).join('\n\n'),
+                  icsUrl: `${ports.config.baseUrl}/booking/${outcome.booking.id}/invite.ics?token=${encodeURIComponent(outcome.manageToken)}`,
+                },
+              }
+            : {}),
         }) +
         shellFoot(true, embed, displayCompany(data)),
     )

@@ -242,7 +242,12 @@ async function syncCalendar(
   // One title and one description for every copy of this meeting, naming
   // the people and their companies (core/domain/calendar-text.ts).
   const title = calendarTitle(eventType, plan.participants)
-  const description = calendarDescription(eventType, booking, plan.participants)
+  // The guest's reschedule-or-cancel link, when this sync carries the
+  // booking's one-time token (the first sync of a new or moved booking does).
+  const manageUrl = msg.manageToken
+    ? `${ports.config.baseUrl.replace(/\/$/, '')}/booking/${booking.id}?token=${encodeURIComponent(msg.manageToken)}`
+    : undefined
+  const description = calendarDescription(eventType, booking, plan.participants, manageUrl)
   const externalFor = (conn: CalendarConnection, attendees: ExternalEvent['attendees']): ExternalEvent => ({
     title,
     description,

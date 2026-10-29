@@ -82,7 +82,7 @@ export async function notifyBookingCreated(ctx: NotifyContext): Promise<void> {
         { email: booking.guestEmail, name: booking.guestName },
         ...(ctx.hosts ?? [host]).map((h) => ({ email: h.email, name: h.name || h.slug })),
       ],
-      ...(await invitationText(ports, booking, eventType, ctx.hosts ?? [host])),
+      ...(await invitationText(ports, booking, eventType, ctx.hosts ?? [host], manageUrl)),
       ...(manageUrl ? { url: manageUrl } : {}),
     })
   } catch (err) {
@@ -307,7 +307,7 @@ async function buildAttachment(
         { email: booking.guestEmail, name: booking.guestName },
         ...(hosts ?? [host]).map((h) => ({ email: h.email, name: h.name || h.slug })),
       ],
-      ...(await invitationText(ports, booking, eventType, hosts ?? [host])),
+      ...(await invitationText(ports, booking, eventType, hosts ?? [host], method === 'CANCEL' ? undefined : url)),
       ...(url ? { url } : {}),
     })
     const encoded = base64(ics)
@@ -507,6 +507,7 @@ async function invitationText(
   booking: Booking,
   eventType: EventType,
   hosts: User[],
+  manageUrl?: string,
 ): Promise<{ summary: string; description: string }> {
   const settings = await hostSettings(ports.repositories({ consistency: 'unconstrained' }), eventType)
   const participants = participantsFor(
@@ -514,5 +515,5 @@ async function invitationText(
     booking,
     hosts.map((user) => ({ user, optional: settings.get(user.id)?.required === false })),
   )
-  return { summary: calendarTitle(eventType, participants), description: calendarDescription(eventType, booking, participants) }
+  return { summary: calendarTitle(eventType, participants), description: calendarDescription(eventType, booking, participants, manageUrl) }
 }

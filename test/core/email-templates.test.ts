@@ -211,7 +211,7 @@ describe('email-client safety', () => {
   it('paints the brand colours', () => {
     const html = bookingConfirmationForGuest(ctx()).html
     expect(html).toContain('#46736E') // mik-green-dark CTA
-    expect(html).toContain('#F7F5F1') // paper
+    expect(html).toContain('bgcolor="#FFFFFF"') // plain white page
     expect(html).toContain('#221F1F') // mik-black ink
   })
 

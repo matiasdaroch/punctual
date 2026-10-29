@@ -540,9 +540,11 @@ input:has(+ .pu-err),select:has(+ .pu-err),textarea:has(+ .pu-err){border-color:
   font-size:.8125rem;color:var(--pu-text-secondary);white-space:nowrap;pointer-events:none}
 
 .pu-confirm{text-align:center;padding:2rem 1.5rem}
-.pu-confirm-icon{display:block;margin:0 auto .75rem;color:var(--pu-text-primary)}
-.pu-ring-arc{stroke:currentColor}
-.pu-ring-dot{fill:var(--pu-signal)}
+.pu-confirm-logo{display:flex;justify-content:center;margin:0 0 1rem}
+.pu-add-cal{margin-top:1.25rem}
+.pu-add-cal .pu-muted{margin:0 0 .5rem;font-size:.875rem}
+.pu-add-cal-btns{display:flex;flex-wrap:wrap;justify-content:center;gap:.5rem}
+.pu-cal-btn{font-size:.875rem;padding:.45rem .8rem}
 .pu-confirm h1{margin:.15rem 0 .35rem}
 .pu-confirm-details{text-align:left;list-style:none;margin:1.25rem 0;padding:1rem 1.25rem;
   background:var(--pu-surface-sunken);border-radius:var(--pu-radius);display:grid;gap:.6rem}

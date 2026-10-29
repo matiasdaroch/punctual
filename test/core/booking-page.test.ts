@@ -353,3 +353,22 @@ describe('team-owned page header and hosts row', () => {
     expect(joinNames(['A', 'B', 'C'], 'or')).toBe('A, B or C')
   })
 })
+
+describe('add to calendar', () => {
+  it('links Google and both Outlooks to a prefilled event, and Apple to the .ics', async () => {
+    const { addToCalendarHtml } = await import('../../src/http/pages/booking.js')
+    const html = addToCalendarHtml({
+      title: 'Discovery call with Matias',
+      start: Date.UTC(2026, 9, 30, 17, 0),
+      end: Date.UTC(2026, 9, 30, 17, 30),
+      location: 'MIK office',
+      details: 'Reschedule or cancel: https://meet.test/booking/b1?token=t',
+      icsUrl: 'https://meet.test/booking/b1/invite.ics?token=t',
+    })
+    expect(html).toContain('https://calendar.google.com/calendar/render?action=TEMPLATE&amp;text=Discovery+call+with+Matias&amp;dates=20261030T170000Z%2F20261030T173000Z')
+    expect(html).toContain('https://outlook.live.com/calendar/0/action/compose?')
+    expect(html).toContain('https://outlook.office.com/calendar/0/action/compose?')
+    expect(html).toContain('startdt=2026-10-30T17%3A00%3A00.000Z')
+    expect(html).toContain('href="https://meet.test/booking/b1/invite.ics?token=t" download>Apple / other (.ics)</a>')
+  })
+})

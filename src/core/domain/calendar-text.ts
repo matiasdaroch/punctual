@@ -132,11 +132,22 @@ function participantLine(p: Participant): string {
  * by question label. Plain text with line breaks; each provider adapter
  * renders it as its API expects.
  */
-export function calendarDescription(eventType: EventType, booking: Booking, participants: Participant[]): string {
+/**
+ * `manageUrl` is the guest's reschedule-or-cancel link, when the caller has
+ * the token for it (only the booking's first sync and its emails do; the
+ * token is never stored).
+ */
+export function calendarDescription(
+  eventType: EventType,
+  booking: Booking,
+  participants: Participant[],
+  manageUrl?: string,
+): string {
   const blocks: string[] = []
   if (eventType.description.trim() !== '') blocks.push(eventType.description.trim())
   blocks.push(['Participants', ...participants.map(participantLine)].join('\n'))
   const answers = answeredQuestions(eventType, booking.answers).map(({ question, value }) => `${question.label}: ${value}`)
   if (answers.length > 0) blocks.push(answers.join('\n'))
+  if (manageUrl) blocks.push(`Need to change it? Reschedule or cancel: ${manageUrl}`)
   return blocks.join('\n\n')
 }
