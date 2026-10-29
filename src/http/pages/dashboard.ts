@@ -1002,6 +1002,15 @@ ${
              ${et === undefined || et.active ? 'checked' : ''}>
       <span>Visible on the booking page</span>
     </label>
+    ${
+      et?.ownerTeamId
+        ? ''
+        : `<label for="mainEvent" style="display:flex;align-items:center;gap:.5rem;margin-top:.5rem">
+      <input id="mainEvent" name="mainEvent" type="checkbox" value="1" style="width:auto"
+             ${et && et.id !== '' && d.user.mainEventTypeId === et.id ? 'checked' : ''}>
+      <span>Make this my main link: <code>/${escapeHtml(d.user.slug)}</code> opens it</span>
+    </label>`
+    }
 
     <div style="margin-top:1.5rem;display:flex;gap:.75rem;flex-wrap:wrap">
       <button class="pu-btn" type="submit">${editing ? 'Save changes' : 'Create event type'}</button>
@@ -3498,7 +3507,9 @@ export function adminPage(d: AdminPageData): string {
           <span class="pu-muted" style="font-size:.8125rem">${escapeHtml(u.email)}</span></td>
         <td class="pu-time" style="white-space:nowrap">/${escapeHtml(u.slug)}</td>
         <td>${u.role === 'admin' ? '<span class="pu-badge">Admin</span>' : '<span class="pu-muted">Member</span>'}</td>
-        <td>${action}</td>
+        <td><div style="display:flex;gap:.4rem;align-items:center">
+          <a class="pu-btn pu-btn-ghost" href="/dashboard/admin/users/${encodeURIComponent(u.id)}/edit"
+             style="padding:.3rem .6rem;font-size:.8125rem;white-space:nowrap">Edit</a>${action}</div></td>
       </tr>`
     })
     .join('\n')
@@ -3573,3 +3584,42 @@ export function adminPage(d: AdminPageData): string {
 
 /** The dashboard shell, for pages that live in their own module (pages/insights.ts). */
 export const dashboardShell = { top: shellTop, bottom: shellBottom }
+
+export interface AdminUserEditData extends DashboardChrome {
+  /** The person being edited. */
+  subject: User
+  /** What was typed, when the save failed validation. */
+  values?: { name: string; slug: string }
+  errors?: Record<string, string>
+}
+
+/**
+ * An admin editing someone else's name and booking address. The address is
+ * the first segment of every link they have shared, so the form says what a
+ * change does before it is made.
+ */
+export function adminUserEditPage(d: AdminUserEditData): string {
+  const errors = d.errors ?? {}
+  const name = d.values?.name ?? d.subject.name
+  const slug = d.values?.slug ?? d.subject.slug
+  return (
+    shellTop(d, `Edit ${d.subject.name || d.subject.slug}`, 'admin') +
+    `<section class="pu-card" aria-label="Edit user">
+  <p><a href="/dashboard/admin">← Back to Admin</a></p>
+  <h2>${escapeHtml(d.subject.name || d.subject.slug)}</h2>
+  <p class="pu-muted">${escapeHtml(d.subject.email)}</p>
+  <form method="post" action="/dashboard/admin/users/${encodeURIComponent(d.subject.id)}/edit">
+    ${csrfField(d.csrf)}
+    <label for="name">Name</label>
+    <input id="name" name="name" maxlength="120" required value="${escapeHtml(name)}"${describedBy('name', errors)}>
+    ${fieldError('name', errors)}
+    <label for="slug">Booking address</label>
+    <input id="slug" name="slug" maxlength="60" required pattern="[a-z0-9-]+" value="${escapeHtml(slug)}"${describedBy('slug', errors)}>
+    ${fieldError('slug', errors)}
+    <p class="pu-help">Their links become <code>/${escapeHtml(slug)}/…</code>. Changing it breaks every link and QR code they have already shared.</p>
+    <div style="margin-top:1.25rem"><button class="pu-btn" type="submit">Save</button></div>
+  </form>
+</section>` +
+    shellBottom(d.brandName)
+  )
+}

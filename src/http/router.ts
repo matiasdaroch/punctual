@@ -26,7 +26,7 @@ import { HOME_KEYS, homeFeatured, homeGroups, homeItems, parseHomeSettings, with
 import { COMPANY_LOGO_KEY, COMPANY_LOGO_SHAPE, companyLogoFrom } from '../core/domain/media.js'
 import { insightEventFor, isLikelyBot, refererHost, type InsightKind } from '../core/domain/insights.js'
 import { docsApiPage, docsIndexPage, docsMcpPage, docsSelfHostingPage } from './pages/docs.js'
-import type { EnginePorts, RequestScope } from '../ports.js'
+import type { EnginePorts, Repositories, RequestScope } from '../ports.js'
 import type { SlotService } from '../engine.js'
 import { daysWithSlots, monthRange } from '../engine.js'
 import type { EventType, LocationOption, User } from '../core/domain/types.js'
@@ -700,6 +700,25 @@ export function buildRouter(ports: EnginePorts, slots: SlotService): Hono<{ Bind
     )
   })
 
+  // -------------------------------------------------------------------------
+  // A person's bare address: /:userSlug opens their main event
+  // -------------------------------------------------------------------------
+  // Registered last, so every fixed one-segment page above (/login,
+  // /dashboard, /docs, …) still wins; user slugs cannot take those names
+  // (core/domain/slugs.ts). A redirect rather than a second copy of the
+  // booking page: the page's own links all live under /:slug/:event, and the
+  // address the person shares stays the short one. The query string rides
+  // along, so ?duration= and ?location= still prefill.
+  app.get('/:userSlug', async (c) => {
+    const repos = ports.repositories(publicScope)
+    const user = await repos.users.bySlug(c.req.param('userSlug'))
+    if (!user) return notFound(c, ports)
+    const target = await mainEventType(repos, user)
+    if (!target) return c.redirect('/', 302)
+    const query = new URL(c.req.url).search
+    return c.redirect(`/${encodeURIComponent(user.slug)}/${encodeURIComponent(target.slug)}${query}`, 302)
+  })
+
   app.notFound((c) => notFound(c, ports))
 
   return app
@@ -879,3 +898,15 @@ const FAVICON = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32">
 <rect x="13" y="9" width="6" height="6" rx="2" fill="#1FC16B"/>
 <rect x="13" y="19" width="6" height="6" rx="2" fill="#1FC16B"/>
 </svg>`
+
+/**
+ * The event a person's bare address opens: the one they marked as their main
+ * event, while it is still theirs and active; otherwise their only active
+ * event, when they have exactly one. Null sends the visitor to the front page.
+ */
+async function mainEventType(repos: Repositories, user: User): Promise<EventType | null> {
+  const own = (await repos.eventTypes.listForUser(user.id)).filter((et) => et.active && et.ownerUserId === user.id)
+  const picked = user.mainEventTypeId ? own.find((et) => et.id === user.mainEventTypeId) : undefined
+  if (picked) return picked
+  return own.length === 1 ? own[0]! : null
+}

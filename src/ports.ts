@@ -111,7 +111,7 @@ export interface UserRepository {
   update(
     id: string,
     patch: Partial<
-      Pick<User, 'name' | 'tz' | 'slug' | 'avatarKey' | 'company' | 'jobTitle' | 'companyUrl' | 'role' | 'digestHour'>
+      Pick<User, 'name' | 'tz' | 'slug' | 'avatarKey' | 'company' | 'jobTitle' | 'companyUrl' | 'role' | 'digestHour' | 'mainEventTypeId'>
     >,
   ): Promise<boolean>
 }

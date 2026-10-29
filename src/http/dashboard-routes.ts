@@ -133,6 +133,7 @@ import {
   questionsParseError,
   parseWeeklyDraft,
   adminPage,
+  adminUserEditPage,
   settingsPage,
   type SettingsPageData,
   slugify,
@@ -829,6 +830,7 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
     }
 
     const created = await repos.eventTypes.create({ ...draft, id: `evt_${ports.crypto.randomToken(12)}` })
+    await saveMainEvent(repos, user, created, form)
     await advanceBookmark(c)
     if (created.ownerTeamId) {
       // Every member hosts a new team event type until the admin narrows
@@ -941,6 +943,7 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
 
     const before = new Set(choices.filter((ch) => ch.selected).map((ch) => ch.user.id))
     await repos.eventTypes.update(existing.id, draft)
+    await saveMainEvent(repos, user, { ...draft, id: existing.id }, form)
     if (draft.ownerTeamId !== null) {
       // Atomic replace, guarded in SQL: a host who left the team or a
       // schedule deleted since the page loaded fails the whole set, and the
@@ -2641,6 +2644,49 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
     return renderAdmin(c, { notice: 'Sign-up policy saved.' })
   })
 
+  // An admin edits someone else's name and booking address — the same rules
+  // as that person's own Settings form, checked against users AND teams.
+  app.get('/dashboard/admin/users/:id/edit', requireSession, requireAdmin, async (c) => {
+    const subject = await c.get('repos').users.byId(c.req.param('id') ?? '')
+    if (!subject) return notFound(c)
+    return c.html(adminUserEditPage({ brandName, user: c.get('user'), csrf: c.get('csrf'), emailDelivery, ...(emailProblem ? { emailProblem } : {}), subject }))
+  })
+
+  app.post('/dashboard/admin/users/:id/edit', requireSession, requireAdmin, async (c) => {
+    const form = await c.req.formData()
+    if (!(await csrfOk(c, form))) return csrfRejected(c)
+    const repos = c.get('repos')
+    const subject = await repos.users.byId(c.req.param('id') ?? '')
+    if (!subject) return notFound(c)
+
+    const name = String(form.get('name') ?? '').trim()
+    const slug = String(form.get('slug') ?? '').trim()
+    const errors: Record<string, string> = {}
+    if (name === '') errors['name'] = 'Name is required'
+    else if (name.length > 120) errors['name'] = 'Must be 120 characters or fewer'
+    if (slug !== subject.slug) {
+      const problem = await slugProblem(repos, slug, subject.id)
+      if (problem) errors['slug'] = problem
+    }
+    const page = (errs: Record<string, string>) =>
+      c.html(
+        adminUserEditPage({ brandName, user: c.get('user'), csrf: c.get('csrf'), emailDelivery, ...(emailProblem ? { emailProblem } : {}), subject, values: { name, slug }, errors: errs }),
+        400,
+      )
+    if (Object.keys(errors).length > 0) return page(errors)
+
+    // `update` reports false when the slug lost a race to someone else's save.
+    const ok = await repos.users.update(subject.id, slug === subject.slug ? { name } : { name, slug })
+    if (!ok) return page({ slug: 'That slug is already taken' })
+    await advanceBookmark(c)
+    return renderAdmin(c, {
+      notice:
+        slug === subject.slug
+          ? `Saved ${name}.`
+          : `Saved ${name}. Their booking address is now /${slug}; links using /${subject.slug} now show "not found".`,
+    })
+  })
+
   app.post('/dashboard/admin/users/:id/role', requireSession, requireAdmin, async (c) => {
     const form = await c.req.formData()
     if (!(await csrfOk(c, form))) return csrfRejected(c)
@@ -3970,4 +4016,30 @@ async function validateEventType(
 /** Hosts for an event type — the shared resolver, as users (core/domain/hosts.ts). */
 async function resolveHosts(repos: Repositories, eventType: EventType, owner: User): Promise<User[]> {
   return hostUsers(await resolveEventTypeHosts(repos, eventType, owner))
+}
+
+/**
+ * The "open this at <base>/<my slug>" switch on a personal event type: on
+ * makes it the host's main event (http/router.ts), off clears it when it was
+ * this one. A team-owned event type is nobody's main event.
+ */
+async function saveMainEvent(repos: Repositories, user: User, et: EventType, form: FormData): Promise<void> {
+  const wanted = form.get('mainEvent') !== null && et.ownerTeamId === null && et.ownerUserId === user.id
+  if (wanted && user.mainEventTypeId !== et.id) await repos.users.update(user.id, { mainEventTypeId: et.id })
+  else if (!wanted && user.mainEventTypeId === et.id) await repos.users.update(user.id, { mainEventTypeId: null })
+}
+
+/**
+ * Why `raw` cannot be this user's booking address, or null when it can:
+ * lowercase on its own (a case difference is refused, not folded away), a
+ * valid and unreserved slug, and not another user's or any team's — the
+ * public page resolves the first segment against both.
+ */
+async function slugProblem(repos: Repositories, raw: string, userId: string): Promise<string | null> {
+  if (raw !== raw.toLowerCase()) return 'Lowercase letters, numbers and hyphens only'
+  const validation = validateSlug(raw)
+  if (!validation.ok) return validation.message ?? 'Not a valid slug'
+  const [existingUser, existingTeam] = await Promise.all([repos.users.bySlug(raw), repos.teams.bySlug(raw)])
+  if ((existingUser && existingUser.id !== userId) || existingTeam) return 'That slug is already taken'
+  return null
 }

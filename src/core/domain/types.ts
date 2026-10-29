@@ -52,6 +52,8 @@ export interface User {
   digestHour?: number | null
   /** Host-local date (YYYY-MM-DD) the digest last went out on. */
   digestSentOn?: string | null
+  /** The event their bare address /<slug> opens (migration 0021); null or absent = none picked. */
+  mainEventTypeId?: string | null
   createdAt: number
 }
 

@@ -176,6 +176,7 @@ export function createD1Repositories(db: D1Database, scope: RequestScope): Repos
       if (patch.companyUrl !== undefined) (sets.push('company_url = ?'), binds.push(patch.companyUrl))
       if (patch.role !== undefined) (sets.push('role = ?'), binds.push(patch.role))
       if (patch.digestHour !== undefined) (sets.push('digest_hour = ?'), binds.push(patch.digestHour))
+      if (patch.mainEventTypeId !== undefined) (sets.push('main_event_type_id = ?'), binds.push(patch.mainEventTypeId))
       if (sets.length === 0) return true
       binds.push(id)
       try {
@@ -1677,6 +1678,7 @@ function mapUser(row: Record<string, unknown> | null): User | null {
     role: row['role'] === 'admin' ? 'admin' : 'member',
     digestHour: row['digest_hour'] == null ? null : Number(row['digest_hour']),
     digestSentOn: row['digest_sent_on'] == null ? null : String(row['digest_sent_on']),
+    mainEventTypeId: row['main_event_type_id'] == null ? null : String(row['main_event_type_id']),
     createdAt: Number(row['created_at']),
   }
 }

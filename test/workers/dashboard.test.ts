@@ -1555,3 +1555,75 @@ describe('settings — morning digest', () => {
     expect((await db.prepare('SELECT digest_hour FROM users WHERE id = ?').bind(HOST_ID).first<{ digest_hour: number | null }>())?.digest_hour).toBeNull()
   })
 })
+
+describe('admin — edit a user', () => {
+  const EDIT_ADMIN = 'usr_edit_admin'
+  const EDIT_SUBJECT = 'usr_edit_subject'
+
+  beforeAll(async () => {
+    await db.batch([
+      db
+        .prepare("INSERT INTO users (id,email,name,tz,slug,role,created_at) VALUES (?,?,?,?,?,'admin',?)")
+        .bind(EDIT_ADMIN, 'edit-admin@example.test', 'Edit Admin', 'UTC', 'edit-admin', NOW),
+      db
+        .prepare("INSERT INTO users (id,email,name,tz,slug,role,created_at) VALUES (?,?,?,?,?,'member',?)")
+        .bind(EDIT_SUBJECT, 'carolina@example.test', 'carolina', 'UTC', 'carolina-old', NOW),
+    ])
+  })
+
+  async function csrfOn(path: string, cookie: string): Promise<string> {
+    return /name="csrf" value="([^"]+)"/.exec(await (await get(path, cookie)).text())?.[1] ?? ''
+  }
+
+  it('lists an Edit link per user and saves another user\'s name and address', async () => {
+    const cookie = await seedSession(EDIT_ADMIN)
+    expect(await (await get('/dashboard/admin', cookie)).text()).toContain(`href="/dashboard/admin/users/${EDIT_SUBJECT}/edit"`)
+    const path = `/dashboard/admin/users/${EDIT_SUBJECT}/edit`
+    const res = await post(path, { name: 'Carolina Pérez', slug: 'carolina', csrf: await csrfOn(path, cookie) }, cookie)
+    expect(res.status).toBe(200)
+    expect(await res.text()).toContain('Their booking address is now /carolina')
+    const row = await db.prepare('SELECT name, slug FROM users WHERE id = ?').bind(EDIT_SUBJECT).first()
+    expect(row).toEqual({ name: 'Carolina Pérez', slug: 'carolina' })
+  })
+
+  it('refuses an address someone else has, and keeps what was typed', async () => {
+    const cookie = await seedSession(EDIT_ADMIN)
+    const path = `/dashboard/admin/users/${EDIT_SUBJECT}/edit`
+    const res = await post(path, { name: 'Carolina', slug: 'edit-admin', csrf: await csrfOn(path, cookie) }, cookie)
+    expect(res.status).toBe(400)
+    const html = await res.text()
+    expect(html).toContain('That slug is already taken')
+    expect(html).toContain('value="edit-admin"')
+  })
+
+  it('is for admins only', async () => {
+    const cookie = await seedSession(EDIT_SUBJECT)
+    const res = await get(`/dashboard/admin/users/${EDIT_ADMIN}/edit`, cookie)
+    expect(res.status).not.toBe(200)
+  })
+})
+
+describe('event types — main link', () => {
+  it('makes the event the host\'s main link when ticked, and clears it when unticked', async () => {
+    const cookie = await seedSession(HOST_ID)
+    const csrf = /name="csrf" value="([^"]+)"/.exec(await (await get('/dashboard/event-types/new', cookie)).text())?.[1] ?? ''
+    const created = await post(
+      '/dashboard/event-types',
+      { title: 'Main one', slug: 'main-one', durationMinutes: '30', active: '1', mainEvent: '1', csrf },
+      cookie,
+    )
+    expect(created.status).toBe(302)
+    const et = (await db.prepare('SELECT id FROM event_types WHERE slug = ?').bind('main-one').first()) as { id: string }
+    const main = async () =>
+      ((await db.prepare('SELECT main_event_type_id AS m FROM users WHERE id = ?').bind(HOST_ID).first()) as { m: string | null }).m
+    expect(await main()).toBe(et.id)
+
+    const edited = await post(
+      `/dashboard/event-types/${et.id}`,
+      { title: 'Main one', slug: 'main-one', durationMinutes: '30', active: '1', csrf },
+      cookie,
+    )
+    expect(edited.status).toBe(302)
+    expect(await main()).toBeNull()
+  })
+})

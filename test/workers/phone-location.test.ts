@@ -123,3 +123,21 @@ describe('invited guests on the booking form', () => {
     expect(html).toContain('ok@example.com, not-an-address</textarea>')
   })
 })
+
+describe('a person\'s bare address', () => {
+  it('opens their only active event, keeping the query string', async () => {
+    // phone-host has two events (seeded above), so mark one as main first.
+    const res0 = await fetchPage('/phone-host')
+    expect(res0.status).toBe(302)
+    expect(res0.headers.get('location')).toBe('/')
+
+    await env.DB.prepare("UPDATE users SET main_event_type_id = 'et_phone_none' WHERE id = 'u_phone_loc'").run()
+    const res = await fetchPage('/phone-host?duration=45&location=phone')
+    expect(res.status).toBe(302)
+    expect(res.headers.get('location')).toBe('/phone-host/no-question?duration=45&location=phone')
+  })
+
+  it('is not found for a slug nobody has', async () => {
+    expect((await fetchPage('/nobody-has-this')).status).toBe(404)
+  })
+})
