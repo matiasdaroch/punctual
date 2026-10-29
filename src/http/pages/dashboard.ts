@@ -774,7 +774,7 @@ function logoPanel(o: { csrf: string; action: string; key: string | null; shape?
             : ''
         }
         ${shapeForm}
-        <p class="pu-muted" style="font-size:.8125rem;margin:.35rem 0 0">${o.hint} PNG, JPEG or WebP, up to 5 MB.</p>
+        <p class="pu-muted" style="font-size:.8125rem;margin:.35rem 0 0">${o.hint} PNG, JPEG or WebP, up to 5 MB and 12 megapixels.</p>
         ${fieldError(o.errorKey, o.errors)}
       </div>
     </div>`
@@ -2448,7 +2448,7 @@ export function settingsPage(d: SettingsPageData): string {
       </form>`
           : ''
       }
-      <p class="pu-muted" style="font-size:.75rem;margin:0;text-align:center">PNG, JPEG or WebP,<br>up to 5&nbsp;MB</p>
+      <p class="pu-muted" style="font-size:.75rem;margin:0;text-align:center">PNG, JPEG or WebP,<br>up to 5&nbsp;MB and 12&nbsp;megapixels<br>(e.g. 4000&times;3000)</p>
       ${fieldError('avatar', errors)}
     </div>
     <form method="post" action="/dashboard/settings/profile" class="pu-profile-fields">

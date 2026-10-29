@@ -2256,7 +2256,7 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
     const bytes = new Uint8Array(await file.arrayBuffer())
     const dimensions = readImageDimensions(bytes, file.type)
     if (!dimensions || dimensions.width * dimensions.height > MAX_DECODED_PIXELS) {
-      return { ok: false, message: 'That image is too large. Try a smaller one.' }
+      return { ok: false, message: 'That image is too large: over 12 megapixels. Resize it to 4000×3000 or smaller.' }
     }
     const originalKey = await deriveBlobKey(bytes, file.type)
     const thumbKey = thumbKeyFor(originalKey)
