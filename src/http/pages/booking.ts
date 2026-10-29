@@ -120,9 +120,6 @@ ${chrome.description ? `<meta name="twitter:description" content="${escapeHtml(c
      leaving it out is what made whole pages repaint mid-view. -->
 <link rel="preload" href="/fonts/mulish-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
 <link rel="preload" href="/fonts/catamaran-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="/fonts/ibmplexmono-400.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="/fonts/ibmplexmono-600.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="/fonts/ibmplexmono-700.woff2" as="font" type="font/woff2" crossorigin>
 <style>${pageCss()}</style>
 </head>
 <body>
@@ -256,7 +253,7 @@ export function avatarHtml(opts: { key: string | null; name: string; size?: numb
     return `<img src="/avatars/${encodeURIComponent(opts.key)}" alt="${escapeHtml(opts.alt ?? opts.name)}" width="${size}" height="${size}" style="width:${size}px;height:${size}px;border-radius:50%;object-fit:cover;display:block;flex:none" loading="lazy">`
   }
   const initial = opts.name.trim().charAt(0).toUpperCase()
-  const layout = `width:${size}px;height:${size}px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--pu-font-mono);font-weight:600;font-size:${Math.round(size * 0.42)}px;flex:none`
+  const layout = `width:${size}px;height:${size}px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-family:var(--pu-font-numeric);font-weight:600;font-size:${Math.round(size * 0.42)}px;flex:none`
   // No name means no initial: a letter from the slug or the email would
   // look like an identity the host never entered. The neutral ring is the
   // open-slot shape — something still to be filled in — not a green badge

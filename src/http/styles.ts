@@ -83,6 +83,7 @@ export const TOKENS = `
   --pu-font-display:"Catamaran","Trebuchet MS",system-ui,sans-serif;
   --pu-font-ui:"Mulish","Trebuchet MS",system-ui,-apple-system,sans-serif;
   --pu-font-mono:"IBM Plex Mono",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --pu-font-numeric:"Mulish","Trebuchet MS",system-ui,sans-serif;
   --pu-radius:2px; --pu-radius-lg:2px;
   --pu-shadow-sm:none;
   --pu-ring:0 0 0 3px color-mix(in srgb,var(--pu-green-700) 25%,transparent);
@@ -274,7 +275,7 @@ h1,h2,h3{font-family:var(--pu-font-display);font-weight:600;line-height:1.2;marg
 h1{font-size:1.5rem} h2{font-size:1.125rem} h3{font-size:1rem}
 p{margin:0 0 .75rem}
 a{color:var(--pu-green-700)}
-time,.pu-time{font-family:var(--pu-font-mono);font-variant-numeric:tabular-nums}
+time,.pu-time{font-family:var(--pu-font-numeric);font-variant-numeric:tabular-nums}
 ::selection{background:var(--pu-green-tint);color:var(--pu-green-800)}
 
 .pu-wrap{max-width:900px;margin:0 auto;padding:1.5rem 1rem 4rem}
@@ -296,7 +297,7 @@ time,.pu-time{font-family:var(--pu-font-mono);font-variant-numeric:tabular-nums}
 .pu-hosts-stack{display:flex;align-items:center}
 .pu-hosts-stack>*{margin-left:-8px;box-shadow:0 0 0 2px var(--pu-paper);border-radius:50%}
 .pu-hosts-stack>:first-child{margin-left:0}
-.pu-hosts-count{width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:var(--pu-paper-dim);color:var(--pu-ink-500);font-family:var(--pu-font-mono);font-size:.75rem}
+.pu-hosts-count{width:32px;height:32px;display:flex;align-items:center;justify-content:center;background:var(--pu-paper-dim);color:var(--pu-ink-500);font-family:var(--pu-font-numeric);font-size:.75rem}
 .pu-hosts-text{margin:0;font-size:.9375rem;line-height:1.4;color:var(--pu-text-secondary)}
 .pu-hosts-text strong{color:var(--pu-ink-950);font-weight:600}
 .pu-hosts-team{color:var(--pu-text-secondary);font-weight:400}
@@ -331,7 +332,7 @@ time,.pu-time{font-family:var(--pu-font-mono);font-variant-numeric:tabular-nums}
 .pu-channel-add{margin-top:.25rem}
 .pu-ins-kpis{display:grid;gap:1rem 1.25rem;grid-template-columns:repeat(auto-fit,minmax(6.75rem,1fr))}
 .pu-ins-kpi{display:flex;flex-direction:column;gap:.15rem}
-.pu-ins-kpi-value{font-family:var(--pu-font-mono);font-weight:700;font-size:1.5rem;font-variant-numeric:tabular-nums}
+.pu-ins-kpi-value{font-family:var(--pu-font-numeric);font-weight:700;font-size:1.5rem;font-variant-numeric:tabular-nums}
 .pu-ins-kpi-label{font-size:.8125rem;color:var(--pu-text-secondary)}
 .pu-ins-chart{margin:1.25rem 0 0}
 .pu-ins-chart svg{display:block;width:100%;height:120px}
@@ -380,7 +381,7 @@ time,.pu-time{font-family:var(--pu-font-mono);font-variant-numeric:tabular-nums}
 .pu-cal-head{font-size:.75rem;font-weight:600;text-align:center;color:var(--pu-text-secondary);padding:.25rem 0}
 .pu-day{position:relative;aspect-ratio:1;display:flex;align-items:center;justify-content:center;
   border:1px solid transparent;border-radius:var(--pu-radius);background:none;
-  font:inherit;font-family:var(--pu-font-mono);font-size:.9375rem;cursor:pointer;
+  font:inherit;font-family:var(--pu-font-numeric);font-variant-numeric:tabular-nums;font-size:.9375rem;cursor:pointer;
   color:var(--pu-text-primary);text-decoration:none;transition:all .12s ease}
 .pu-day[data-has-slots="1"]{background:var(--pu-green-tint);color:var(--pu-green-700);font-weight:700}
 .pu-day[aria-disabled="true"]{color:var(--pu-text-disabled);cursor:default}
@@ -400,7 +401,7 @@ input:focus-visible,select:focus-visible,textarea:focus-visible{
    these) so a slot's appearance is never a color chosen ad hoc at a call
    site. */
 .pu-slot{padding:.75rem .5rem;border:1px solid var(--pu-line);border-radius:var(--pu-radius);
-  font-family:var(--pu-font-mono);font-size:.9375rem;font-weight:600;
+  font-family:var(--pu-font-numeric);font-variant-numeric:tabular-nums;font-size:.9375rem;font-weight:600;
   text-align:center;text-decoration:none;display:block;transition:all .12s ease}
 .pu-slot-available{background:var(--pu-slot-available-bg);border-color:var(--pu-slot-available-border);
   color:var(--pu-slot-available-text);cursor:pointer}
@@ -816,7 +817,7 @@ form:has(#locationType option[value="google_meet"]:checked) .pu-loc-wrap{display
 .pu-host-move-btn:disabled{opacity:.35;cursor:default}
 .pu-host-weight{display:flex;align-items:center;gap:.5rem}
 .pu-host-weight input{flex:1;min-width:0;margin:0}
-.pu-host-share{flex:none;font-family:var(--pu-font-mono);font-size:.8125rem;color:var(--pu-text-secondary);white-space:nowrap}
+.pu-host-share{flex:none;font-family:var(--pu-font-numeric);font-size:.8125rem;color:var(--pu-text-secondary);white-space:nowrap}
 .pu-host-sched-note{display:block;margin-top:.2rem;font-size:.75rem;line-height:1.35;color:var(--pu-text-secondary);overflow-wrap:anywhere}
 .pu-host-sched-note:empty{display:none}
 .pu-host-preview{margin:.75rem 0 0;font-size:.9375rem;line-height:1.45;color:var(--pu-text-secondary);overflow-wrap:anywhere}
@@ -930,7 +931,7 @@ export const LANDING_CSS = `
 .pu-steps li{counter-increment:pu-step;padding-top:2.75rem;position:relative}
 .pu-steps li::before{content:counter(pu-step);position:absolute;top:0;left:0;
   width:2rem;height:2rem;border-radius:99px;background:var(--pu-green-fill);color:#fff;
-  display:flex;align-items:center;justify-content:center;font-family:var(--pu-font-mono);
+  display:flex;align-items:center;justify-content:center;font-family:var(--pu-font-numeric);
   font-weight:700;font-size:.875rem}
 
 .pu-compare{display:grid;gap:1.25rem;grid-template-columns:1fr}
