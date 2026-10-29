@@ -693,6 +693,35 @@ function questionRowHtml(r: QuestionRow, i: number | string): string {
  * row. Without JS the form still works: it always renders one blank row to
  * fill in, and clearing a row's kind or question drops it on save.
  */
+/**
+ * MIK customization: crops and shrinks an image in the browser before the
+ * upload form submits, sending a 256px square (`prepared_thumb`) and a
+ * 256px-tall rendering (`prepared_fit`) with it, so the Worker stores them
+ * without decoding anything (see storeUploadedImage). The image itself is
+ * re-encoded only when it is over 2048px, over 5 MB or not PNG/JPEG/WebP
+ * (an iPhone HEIC, say). Any failure submits the file untouched and the
+ * server resizes it as before.
+ */
+const IMAGE_PREP_SCRIPT = `window.puPrepUpload=window.puPrepUpload||function(input){
+var form=input.form,file=input.files&&input.files[0];if(!file)return;
+function send(){form.submit()}
+if(!window.createImageBitmap||!window.DataTransfer||!HTMLCanvasElement.prototype.toBlob){send();return}
+function scaled(img,sx,sy,sw,sh,w,h){var c=document.createElement('canvas');c.width=sw;c.height=sh;c.getContext('2d').drawImage(img,sx,sy,sw,sh,0,0,sw,sh);
+while(c.width/2>=w&&c.height/2>=h){var n=document.createElement('canvas');n.width=Math.round(c.width/2);n.height=Math.round(c.height/2);var nx=n.getContext('2d');nx.imageSmoothingQuality='high';nx.drawImage(c,0,0,n.width,n.height);c=n}
+var o=document.createElement('canvas');o.width=w;o.height=h;var ox=o.getContext('2d');ox.imageSmoothingQuality='high';ox.drawImage(c,0,0,w,h);return o}
+function blob(c,type,q){return new Promise(function(r,j){c.toBlob(function(b){b?r(b):j(new Error('encode'))},type,q)})}
+function attach(name,b,ext){var i=form.querySelector('input[name="'+name+'"]');if(!i){i=document.createElement('input');i.type='file';i.name=name;i.hidden=true;form.appendChild(i)}
+var t=new DataTransfer();t.items.add(new File([b],name+'.'+ext,{type:b.type}));i.files=t.files}
+function ext(b){return b.type==='image/webp'?'webp':b.type==='image/jpeg'?'jpg':'png'}
+createImageBitmap(file).then(function(img){var W=img.width,H=img.height,side=Math.min(W,H);
+var fh=256,fw=Math.max(1,Math.round(W*256/H));if(fw>1024){fw=1024;fh=Math.max(1,Math.round(H*1024/W))}
+var big=Math.max(W,H)>2048,ok=/^image\\/(png|jpeg|webp)$/.test(file.type);
+var jobs=[blob(scaled(img,Math.floor((W-side)/2),Math.floor((H-side)/2),side,side,256,256),'image/webp',0.9),blob(scaled(img,0,0,W,H,fw,fh),'image/webp',0.9)];
+if(big||!ok||file.size>5242880){var k=Math.min(1,2048/Math.max(W,H)),png=file.type==='image/png';jobs.push(blob(scaled(img,0,0,W,H,Math.max(1,Math.round(W*k)),Math.max(1,Math.round(H*k))),png?'image/png':'image/jpeg',0.9))}
+return Promise.all(jobs).then(function(b){attach('prepared_thumb',b[0],ext(b[0]));attach('prepared_fit',b[1],ext(b[1]));
+if(b[2]){var t=new DataTransfer();t.items.add(new File([b[2]],'image.'+ext(b[2]),{type:b[2].type}));input.files=t.files}
+send()})}).catch(send)}`
+
 const ROW_EDITOR_SCRIPT = `document.addEventListener('click',function(e){var t=e.target;if(!(t instanceof Element))return;
 var add=t.closest('.pu-row-add');if(add){var box=document.getElementById(add.getAttribute('data-rows'));var tpl=document.getElementById(add.getAttribute('data-template'));
 var n=Number(box.getAttribute('data-next'))||box.children.length;box.setAttribute('data-next',String(n+1));
@@ -761,10 +790,11 @@ function logoPanel(o: { csrf: string; action: string; key: string | null; shape?
           ${csrfField(o.csrf)}
           <label class="pu-btn pu-btn-ghost pu-file-btn">${o.key ? 'Replace logo' : 'Upload logo'}
             <input type="file" name="logo" accept="image/png,image/jpeg,image/webp" class="pu-sr"
-                   aria-label="Choose a logo" onchange="this.form.submit()"${describedBy(o.errorKey, o.errors)}>
+                   aria-label="Choose a logo" onchange="puPrepUpload(this)"${describedBy(o.errorKey, o.errors)}>
           </label>
           <noscript><button class="pu-btn" type="submit" style="margin-top:.5rem">Upload</button></noscript>
         </form>
+<script>${IMAGE_PREP_SCRIPT}</script>
         ${
           o.key
             ? `<form method="post" action="${escapeHtml(o.action)}/delete" style="margin:.35rem 0 0">
@@ -774,7 +804,7 @@ function logoPanel(o: { csrf: string; action: string; key: string | null; shape?
             : ''
         }
         ${shapeForm}
-        <p class="pu-muted" style="font-size:.8125rem;margin:.35rem 0 0">${o.hint} PNG, JPEG or WebP, up to 5 MB and 12 megapixels.</p>
+        <p class="pu-muted" style="font-size:.8125rem;margin:.35rem 0 0">${o.hint} PNG, JPEG or WebP; large images are shrunk automatically.</p>
         ${fieldError(o.errorKey, o.errors)}
       </div>
     </div>`
@@ -2436,10 +2466,11 @@ export function settingsPage(d: SettingsPageData): string {
         ${csrfField(d.csrf)}
         <label class="pu-btn pu-btn-ghost pu-file-btn">Upload photo
           <input type="file" name="avatar" accept="image/png,image/jpeg,image/webp" class="pu-sr"
-                 aria-label="Choose a photo" onchange="this.form.submit()"${describedBy('avatar', errors)}>
+                 aria-label="Choose a photo" onchange="puPrepUpload(this)"${describedBy('avatar', errors)}>
         </label>
         <noscript><button class="pu-btn" type="submit" style="margin-top:.5rem">Upload</button></noscript>
       </form>
+<script>${IMAGE_PREP_SCRIPT}</script>
       ${
         d.user.avatarKey
           ? `<form method="post" action="/dashboard/settings/avatar/delete">
@@ -2448,7 +2479,7 @@ export function settingsPage(d: SettingsPageData): string {
       </form>`
           : ''
       }
-      <p class="pu-muted" style="font-size:.75rem;margin:0;text-align:center">PNG, JPEG or WebP,<br>up to 5&nbsp;MB and 12&nbsp;megapixels<br>(e.g. 4000&times;3000)</p>
+      <p class="pu-muted" style="font-size:.75rem;margin:0;text-align:center">PNG, JPEG or WebP.<br>Large photos are<br>shrunk automatically.</p>
       ${fieldError('avatar', errors)}
     </div>
     <form method="post" action="/dashboard/settings/profile" class="pu-profile-fields">

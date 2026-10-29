@@ -83,6 +83,13 @@ export function isLogoShape(value: string): value is LogoShape {
 export const THUMB_DIMENSION = 256
 /** Height of the uncropped "fit" thumbnail; width follows the source's proportions, capped at FIT_MAX_WIDTH. */
 export const FIT_HEIGHT = 256
+
+/**
+ * MIK customization: the cap on each browser-made rendering sent with an
+ * upload. A 256px square or a 1024x256 strip is tens of KB as WebP; a PNG
+ * fallback stays well under this.
+ */
+export const MAX_PREPARED_BYTES = 1024 * 1024
 export const FIT_MAX_WIDTH = 1024
 export const THUMB_CONTENT_TYPE = 'image/webp'
 

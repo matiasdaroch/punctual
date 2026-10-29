@@ -98,8 +98,13 @@ import { buildInsightsReport, periodFrom, periodStart } from '../core/domain/ins
 import { HOME_CONTACT, HOME_EVENT_TYPES, HOME_FEATURED, HOME_INTRO, HOME_INTRO_MAX, HOME_KEYS, HOME_MODE, HOME_TITLE, HOME_TITLE_MAX, HOME_WEBSITE, isEmailAddress, parseHomeSettings } from '../core/domain/home.js'
 import { notifyNewHosts as notifyNewHostsShared } from './host-notifications.js'
 import { MAX_DECODED_PIXELS,
+  MAX_PREPARED_BYTES,
   MAX_UPLOAD_BYTES,
+  FIT_HEIGHT,
+  FIT_MAX_WIDTH,
   THUMB_CONTENT_TYPE,
+  THUMB_DIMENSION,
+  type AllowedImageType,
   deriveBlobKey,
   isAllowedImageType,
   readImageDimensions,
@@ -992,7 +997,7 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
     if (!(await csrfOk(c, form))) return csrfRejected(c)
     const existing = await ownedEventType(c)
     if (!existing) return notFound(c)
-    const stored = await storeUploadedImage(form.get('logo'))
+    const stored = await storeUploadedImage(form.get('logo'), form)
     if (!stored.ok) return c.html(eventTypeForm({ ...(await editFormData(c, existing)), errors: { logo: stored.message } }), 400)
     await c.get('repos').eventTypes.update(existing.id, { logoKey: stored.key })
     await advanceBookmark(c)
@@ -2249,7 +2254,10 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
    * so the three cannot drift on limits or on what "too large" means.
    * Returns the THUMBNAIL key, the only one a page ever references.
    */
-  async function storeUploadedImage(file: string | File | null): Promise<{ ok: true; key: string } | { ok: false; message: string }> {
+  async function storeUploadedImage(
+    file: string | File | null,
+    form?: FormData,
+  ): Promise<{ ok: true; key: string } | { ok: false; message: string }> {
     if (ports.config.uploadsUnavailable) return { ok: false, message: 'Image uploads aren’t set up on this server yet (no R2 storage bucket).' }
     if (!(file instanceof File) || file.size === 0) return { ok: false, message: 'Choose an image to upload' }
     if (file.size > MAX_UPLOAD_BYTES) return { ok: false, message: 'That file is larger than 5 MB' }
@@ -2261,6 +2269,18 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
     }
     const originalKey = await deriveBlobKey(bytes, file.type)
     const thumbKey = thumbKeyFor(originalKey)
+    // MIK customization: the dashboard's upload script crops and shrinks
+    // in the browser and sends both renderings alongside the image. A
+    // server-side decode and Lanczos resize costs ~100 ms of CPU per
+    // rendering, ten times the Workers Free per-request budget (error
+    // 1102), so when both arrive well-formed nothing is decoded here.
+    const prepared = form ? await readPreparedThumbnails(form) : null
+    if (prepared) {
+      await ports.blobStorage.put(originalKey, bytes, file.type)
+      await ports.blobStorage.put(thumbKey, prepared.thumb.bytes, prepared.thumb.type)
+      await ports.blobStorage.put(fitKeyFor(thumbKey), prepared.fit.bytes, prepared.fit.type)
+      return { ok: true, key: thumbKey }
+    }
     if (!(await ports.blobStorage.get(thumbKey))) {
       const thumb = resizeToSquareThumbnail(bytes)
       if (!thumb) return { ok: false, message: 'Could not process that image. Try a different file.' }
@@ -2274,6 +2294,28 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
       if (fit) await ports.blobStorage.put(fitKeyFor(thumbKey), fit, THUMB_CONTENT_TYPE)
     }
     return { ok: true, key: thumbKey }
+  }
+
+  /**
+   * The browser-made renderings, or null when either is missing or not what
+   * the resizer would have made: a THUMB_DIMENSION square, and a fit image
+   * no taller than FIT_HEIGHT nor wider than FIT_MAX_WIDTH. Dimensions come
+   * from the file header alone, like the original's check above.
+   */
+  async function readPreparedThumbnails(form: FormData): Promise<{
+    thumb: { bytes: Uint8Array; type: AllowedImageType }
+    fit: { bytes: Uint8Array; type: AllowedImageType }
+  } | null> {
+    const read = async (value: string | File | null, fits: (w: number, h: number) => boolean) => {
+      if (!(value instanceof File) || value.size === 0 || value.size > MAX_PREPARED_BYTES) return null
+      if (!isAllowedImageType(value.type)) return null
+      const bytes = new Uint8Array(await value.arrayBuffer())
+      const size = readImageDimensions(bytes, value.type)
+      return size && fits(size.width, size.height) ? { bytes, type: value.type } : null
+    }
+    const thumb = await read(form.get('prepared_thumb'), (w, h) => w === THUMB_DIMENSION && h === THUMB_DIMENSION)
+    const fit = await read(form.get('prepared_fit'), (w, h) => w >= 1 && h >= 1 && w <= FIT_MAX_WIDTH && h <= FIT_HEIGHT)
+    return thumb && fit ? { thumb, fit } : null
   }
 
   /**
@@ -2305,7 +2347,7 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
       c.html(settingsPage({ channels: await repos.channels.listForOwner('user', user.id), brandName, baseUrl: ports.config.baseUrl, user, csrf: c.get('csrf'),
  emailDelivery, ...(emailProblem ? { emailProblem } : {}), errors: { avatar: message } }), 400)
 
-    const stored = await storeUploadedImage(form.get('avatar'))
+    const stored = await storeUploadedImage(form.get('avatar'), form)
     if (!stored.ok) return fail(stored.message)
     const thumbKey = stored.key
 
@@ -2407,7 +2449,7 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
   app.post('/dashboard/admin/logo', requireSession, requireAdmin, async (c) => {
     const form = await c.req.formData()
     if (!(await csrfOk(c, form))) return csrfRejected(c)
-    const stored = await storeUploadedImage(form.get('logo'))
+    const stored = await storeUploadedImage(form.get('logo'), form)
     if (!stored.ok) return renderAdmin(c, { errors: { 'company-logo': stored.message } }, 400)
     await c.get('repos').settings.set(COMPANY_LOGO_KEY, stored.key, ports.clock.now())
     await advanceBookmark(c)

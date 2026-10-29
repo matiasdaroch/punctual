@@ -71,6 +71,24 @@ function bombPngBytes(): Uint8Array {
   return header
 }
 
+/**
+ * A PNG that is only a header claiming `width` x `height`: enough for the
+ * prepared-thumbnail checks, which read dimensions from the header and
+ * never decode. Its bytes coming back verbatim from /avatars/:key proves
+ * the server stored it as sent rather than resizing anything.
+ */
+function headerPngBytes(width: number, height: number, salt = 0): Uint8Array {
+  const header = new Uint8Array(25)
+  header.set([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a], 0)
+  header.set([0, 0, 0, 13], 8)
+  header.set([0x49, 0x48, 0x44, 0x52], 12)
+  const view = new DataView(header.buffer)
+  view.setUint32(16, width, false)
+  view.setUint32(20, height, false)
+  header[24] = salt
+  return header
+}
+
 const crypto_ = createWebCrypto({
   keys: { 1: 'dGVzdC1lbmNyeXB0aW9uLWtleS0zMi1ieXRlcy0hIQ==' },
   currentVersion: 1,
@@ -143,6 +161,23 @@ async function uploadAvatar(
   const form = new FormData()
   form.append('csrf', csrf)
   form.append('avatar', new File([file.bytes], file.name ?? 'photo.png', { type: file.type }))
+  return app.fetch(
+    new Request(`${BASE}/dashboard/settings/avatar`, { method: 'POST', body: form, headers: { cookie } }),
+  )
+}
+
+async function uploadPrepared(
+  cookie: string,
+  csrf: string,
+  original: Uint8Array,
+  thumb: Uint8Array,
+  fit: Uint8Array,
+): Promise<Response> {
+  const form = new FormData()
+  form.append('csrf', csrf)
+  form.append('avatar', new File([original], 'photo.png', { type: 'image/png' }))
+  form.append('prepared_thumb', new File([thumb], 'thumb.png', { type: 'image/png' }))
+  form.append('prepared_fit', new File([fit], 'fit.png', { type: 'image/png' }))
   return app.fetch(
     new Request(`${BASE}/dashboard/settings/avatar`, { method: 'POST', body: form, headers: { cookie } }),
   )
@@ -284,6 +319,37 @@ describe('avatar upload', () => {
     const secondKey = /\/avatars\/([a-f0-9]{64}-thumb\.webp)/.exec(await second.text())?.[1]
 
     expect(firstKey).toBe(secondKey)
+  })
+})
+
+describe('browser-prepared thumbnails', () => {
+  it('stores a well-formed prepared thumb and fit as sent, without decoding the upload', async () => {
+    const cookie = await seedSession(HOST_ID)
+    const csrf = await csrfFor(cookie)
+    // The original is a header only: a server-side resize would fail on it,
+    // so a 200 here means nothing was decoded.
+    const thumb = headerPngBytes(256, 256, 1)
+    const fit = headerPngBytes(384, 256, 2)
+    const res = await uploadPrepared(cookie, csrf, headerPngBytes(1334, 2000, 3), thumb, fit)
+    expect(res.status).toBe(200)
+    const key = /\/avatars\/([a-f0-9]{64}-thumb\.webp)/.exec(await res.text())?.[1]
+    expect(key).toBeTruthy()
+
+    const served = await app.fetch(new Request(`${BASE}/avatars/${key}`))
+    expect(served.headers.get('content-type')).toBe('image/png')
+    expect(new Uint8Array(await served.arrayBuffer())).toEqual(thumb)
+    const servedFit = await app.fetch(new Request(`${BASE}/avatars/${key!.replace(/-thumb\.webp$/, '-fit.webp')}`))
+    expect(new Uint8Array(await servedFit.arrayBuffer())).toEqual(fit)
+  })
+
+  it('ignores a prepared thumb that is not a 256px square and resizes on the server instead', async () => {
+    const cookie = await seedSession(HOST_ID)
+    const csrf = await csrfFor(cookie)
+    const res = await uploadPrepared(cookie, csrf, pngBytes(), headerPngBytes(300, 256, 4), headerPngBytes(384, 256, 5))
+    expect(res.status).toBe(200)
+    const key = /\/avatars\/([a-f0-9]{64}-thumb\.webp)/.exec(await res.text())?.[1]
+    const served = await app.fetch(new Request(`${BASE}/avatars/${key}`))
+    expect(served.headers.get('content-type')).toBe('image/webp')
   })
 })
 
