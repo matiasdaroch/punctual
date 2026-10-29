@@ -18,9 +18,9 @@
 import type { ResolvedHost } from '../../core/domain/hosts.js'
 import { fitKeyFor, type LogoShape } from '../../core/domain/media.js'
 import type { CompanyLogo,
-  Team, EventType, LocationType, Slot, User } from '../../core/domain/types.js'
+  Team, EventType, EventTypeQuestion, LocationType, Slot, User } from '../../core/domain/types.js'
 import { effectiveQuestions } from '../../core/domain/booking-service.js'
-import { CALLING_CODES, splitPhone } from '../../core/domain/phone.js'
+import { CALLING_CODES, joinPhone, splitPhone } from '../../core/domain/phone.js'
 import {
   durationChoices,
   guestFieldLabel,
@@ -463,14 +463,25 @@ const CALLING_CODE_OPTIONS = CALLING_CODES.map(
  * `q_<id>__country` and `q_<id>`, which the router joins into one answer
  * (core/domain/phone.ts). The label's `for` points at the number.
  */
-function phoneField(id: string, value: string, req: string, desc: string): string {
+function phoneField(name: string, id: string, value: string, attrs: string): string {
   const { iso, number } = splitPhone(value)
   const options = CALLING_CODE_OPTIONS.replace(`value="${iso}">`, `value="${iso}" selected>`)
   return `<span class="pu-phone">
-          <select name="q_${escapeHtml(id)}__country" aria-label="Country code" autocomplete="tel-country-code">${options}</select>
-          <input id="q-${escapeHtml(id)}" name="q_${escapeHtml(id)}" type="tel" autocomplete="tel-national" inputmode="tel"
-                 value="${escapeHtml(number)}"${req}${desc}>
+          <select name="${escapeHtml(name)}__country" aria-label="Country code" autocomplete="tel-country-code">${options}</select>
+          <input id="${escapeHtml(id)}" name="${escapeHtml(name)}" type="tel" autocomplete="tel-national" inputmode="tel"
+                 value="${escapeHtml(number)}"${attrs}>
         </span>`
+}
+
+/** A phone field's value as last posted, country and number joined, for refilling it. */
+function typedPhone(values: Record<string, string>, field: string): string {
+  const iso = values[`${field}__country`]
+  return iso === undefined ? (values[field] ?? '') : joinPhone(iso, values[field] ?? '')
+}
+
+/** The event type's own phone-number question, if it asks one: a phone call then dials that answer. */
+export function phoneQuestionOf(et: EventType): EventTypeQuestion | undefined {
+  return effectiveQuestions(et).find((q) => q.type === 'phone')
 }
 
 /** `&duration=…&location=…` for the guest's choices, appended to every internal link. */
@@ -500,17 +511,29 @@ function locationFieldset(d: BookingPageData, errors: Record<string, string>, va
   const choices = locationChoices(d.eventType)
   if (choices.length < 2) return ''
   const picked = values['location'] !== undefined ? Number(values['location']) - 1 : (d.location ?? 0)
+  const phoneQuestion = phoneQuestionOf(d.eventType)
   const items = choices
     .map((o, i) => {
       const id = `loc-${i + 1}`
       const radio = `<label class="pu-radio" for="${id}"><input type="radio" id="${id}" name="location" value="${i + 1}"${i === picked ? ' checked' : ''}> ${escapeHtml(locationOptionLabel(o))}</label>`
       if (!guestSupplies(o)) return radio
+      // The form already asks for a phone number: a call dials that one,
+      // rather than asking the guest for their number twice.
+      if (o.type === 'phone' && phoneQuestion) {
+        return `${radio}
+      <p class="pu-radio-detail pu-muted">We'll call the number you give under “${escapeHtml(phoneQuestion.label)}”.</p>`
+      }
       const field = `location_detail_${i + 1}`
       const err = errors[field]
+      const described = err ? ` aria-describedby="err-${field}"` : ''
+      const input =
+        o.type === 'phone'
+          ? phoneField(field, field, typedPhone(values, field), ` maxlength="40"${described}`)
+          : `<input id="${field}" name="${field}" maxlength="500" value="${escapeHtml(values[field] ?? '')}" autocomplete="street-address"${described}>`
       return `${radio}
       <div class="pu-radio-detail">
         <label for="${field}">${escapeHtml(guestFieldLabel(o))}</label>
-        <input id="${field}" name="${field}" maxlength="500" value="${escapeHtml(values[field] ?? '')}"${o.type === 'phone' ? ' type="tel" autocomplete="tel"' : ' autocomplete="street-address"'}${err ? ` aria-describedby="err-${field}"` : ''}>
+        ${input}
         ${err ? `<p class="pu-err" id="err-${field}">${escapeHtml(err)}</p>` : ''}
       </div>`
     })
@@ -781,7 +804,7 @@ export function confirmForm(
                    .join('')}
                </select>`
             : q.type === 'phone'
-              ? phoneField(q.id, values[q.id] ?? '', req, desc)
+              ? phoneField(`q_${q.id}`, `q-${q.id}`, values[q.id] ?? '', `${req}${desc}`)
               : `<input id="q-${escapeHtml(q.id)}" name="q_${escapeHtml(q.id)}" value="${val}"${req}${desc}>`
       return `<label for="q-${escapeHtml(q.id)}">${escapeHtml(q.label)}${q.required ? '' : ' <span class="pu-muted">(optional)</span>'}</label>
         ${field}

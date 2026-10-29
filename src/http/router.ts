@@ -40,11 +40,12 @@ import {
   withDuration,
 } from '../core/domain/booking-options.js'
 import { describeLocation } from '../core/ics.js'
-import { joinPhone } from '../core/domain/phone.js'
+import { isValidPhone, joinPhone } from '../core/domain/phone.js'
 import { hostUsers as hostUsers_, resolveHosts as resolveEventTypeHosts } from '../core/domain/hosts.js'
 import { isValidTimeZone, localDateString } from '../core/time/zone.js'
 import {
   bookedConfirmation,
+  phoneQuestionOf,
   confirmForm,
   displayCompany,
   errorPage,
@@ -601,8 +602,8 @@ export function buildRouter(ports: EnginePorts, slots: SlotService): Hono<{ Bind
     // BOTH confirmations are lost while the slot stays booked.
     else if (name.length > 200) errors['name'] = 'Please use 200 characters or fewer'
     if (!isValidEmail(email)) errors['email'] = 'Please enter a valid email address'
-    const located = readLocation(ctx.eventType, form)
-    if ('error' in located) errors[located.field] = located.error
+    const located = readLocation(ctx.eventType, form, declared)
+    if ('error' in located) errors[located.field] ??= located.error
 
     if (Object.keys(errors).length > 0) {
       return c.html(
@@ -715,6 +716,7 @@ function readChoice(
 function readLocation(
   base: EventType,
   form: FormData,
+  answers: Record<string, string>,
 ): { location: LocationOption | null } | { error: string; field: string } {
   const choices = locationChoices(base)
   if (choices.length < 2) return { location: null }
@@ -722,13 +724,27 @@ function readLocation(
   if (index === null) return { error: 'Please choose where to meet', field: 'location' }
   const option = choices[index]!
   if (!guestSupplies(option)) return { location: option }
+  if (option.type === 'phone') {
+    // The form's own phone question, when it has one, is the number to
+    // call; it is already validated as a phone answer, so only its absence
+    // (an optional question left blank) needs saying here.
+    const question = phoneQuestionOf(base)
+    if (question) {
+      const number = answers[question.id] ?? ''
+      return number === ''
+        ? { error: 'Please give a number we can call', field: question.id }
+        : { location: { type: 'phone', value: number } }
+    }
+    const field = `location_detail_${index + 1}`
+    const number = joinPhone(String(form.get(`${field}__country`) ?? 'US'), String(form.get(field) ?? ''))
+    if (number === '') return { error: 'Please give a number we can call', field }
+    if (!isValidPhone(number)) return { error: 'Please enter a valid phone number', field }
+    return { location: { type: 'phone', value: number } }
+  }
   const field = `location_detail_${index + 1}`
   const typed = String(form.get(field) ?? '').trim()
   if (typed === '') {
-    return {
-      error: option.type === 'phone' ? 'Please give a number we can call' : 'Please give the address',
-      field,
-    }
+    return { error: 'Please give the address', field }
   }
   if (typed.length > 500) return { error: 'Please use 500 characters or fewer', field }
   return { location: { type: option.type, value: typed } }
