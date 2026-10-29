@@ -367,6 +367,7 @@ time,.pu-time{font-family:var(--pu-font-mono);font-variant-numeric:tabular-nums}
 .pu-radio{display:flex;align-items:center;gap:.5rem;font-weight:400;margin:.4rem 0}
 .pu-radio input{width:auto;margin:0}
 .pu-radio-detail{margin:0 0 .5rem 1.6rem}
+.pu-radio:not(:has(input:checked)) + .pu-radio-detail{display:none}
 
 .pu-grid{display:grid;gap:1.5rem;grid-template-columns:1fr}
 @media(min-width:780px){.pu-grid{grid-template-columns:300px 1fr}}

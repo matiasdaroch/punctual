@@ -94,6 +94,10 @@ describe('applying a choice', () => {
     expect(withDuration(et, 30)).toBe(et)
   })
 
+  it('keeps every length on offer after one is picked', () => {
+    expect(durationChoices(withDuration(et, 60))).toEqual([30, 45, 60])
+  })
+
   it('reapplies a stored booking\'s length and location', () => {
     const booking = {
       startUtc: 0,

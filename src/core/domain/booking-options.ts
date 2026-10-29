@@ -42,10 +42,19 @@ export function guestSupplies(option: LocationOption): boolean {
   return (option.type === 'phone' || option.type === 'in_person') && !option.value
 }
 
-/** The event type as if `minutes` were its duration, on its own slot grid. */
+/**
+ * The event type as if `minutes` were its duration, on its own slot grid.
+ * The other lengths stay on offer, the original default among them, so a
+ * picker drawn from the result still lists every one.
+ */
 export function withDuration(et: EventType, minutes: number): EventType {
   if (minutes === et.durationMinutes) return et
-  return { ...et, durationMinutes: minutes, slotIntervalMinutes: et.slotIntervalMinutes ?? et.durationMinutes }
+  return {
+    ...et,
+    durationMinutes: minutes,
+    durationOptions: durationChoices(et),
+    slotIntervalMinutes: et.slotIntervalMinutes ?? et.durationMinutes,
+  }
 }
 
 /** The event type as if `option` were its only location. */
