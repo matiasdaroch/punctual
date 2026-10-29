@@ -51,7 +51,16 @@ import { DIGEST_HOURS } from '../../core/domain/digest.js'
 import type { ZoneTraffic } from '../../adapters/insights/zone-analytics.js'
 import { slotStateClassName } from '../../core/slot-state.js'
 import { slugify } from '../../core/domain/booking-service.js'
-import { durationChoices, formatLocationOptions } from '../../core/domain/booking-options.js'
+import { durationChoices } from '../../core/domain/booking-options.js'
+import {
+  LOCATION_KINDS,
+  QUESTION_KINDS,
+  locationRowsOf,
+  questionRowsOf,
+  type EventTypeRows,
+  type LocationRow,
+  type QuestionRow,
+} from '../../core/domain/event-type-rows.js'
 import { formatInZone, localDateString, offsetLabel } from '../../core/time/zone.js'
 import type { ResolvedHost } from '../../core/domain/hosts.js'
 import { avatarHtml, brandLogoHtml, escapeHtml, hostsSentence, joinNames, logoHtml, shellFoot, shellHead } from './booking.js'
@@ -596,7 +605,9 @@ export interface EventTypeFormData extends DashboardChrome {
    */
   questionsText?: string
   /** The guest-choice fields as typed, for the same reason as `questionsText`. */
-  optionsText?: { durations: string; locations: string }
+  optionsText?: { durations: string }
+  /** The location and question rows as posted, to refill a form that failed validation. */
+  rows?: EventTypeRows
   /**
    * The host's own schedules — the "Availability schedule" choices beside
    * "Default". Same precedent as `teams` above: when there's only the one
@@ -643,12 +654,50 @@ export interface HostDraft {
   weightText: string
 }
 
-const LOCATION_OPTIONS: ReadonlyArray<{ value: EventType['locationType']; label: string }> = [
-  { value: 'google_meet', label: 'Google Meet' },
-  { value: 'custom_link', label: 'Custom link' },
-  { value: 'phone', label: 'Phone call' },
-  { value: 'in_person', label: 'In person' },
-]
+const BLANK_LOCATION_ROW: LocationRow = { type: '', value: '', label: '' }
+const BLANK_QUESTION_ROW: QuestionRow = { label: '', type: 'text', options: '', required: false }
+
+function selectOptions(kinds: ReadonlyArray<{ value: string; label: string }>, selected: string): string {
+  return kinds
+    .map((k) => `<option value="${k.value}"${k.value === selected ? ' selected' : ''}>${escapeHtml(k.label)}</option>`)
+    .join('')
+}
+
+/**
+ * One location row. `i` is the field index, or `__i__` inside the template
+ * the "Add location" button clones. A row whose kind is left on "—" is
+ * skipped on save, which is also how a row is removed without JS.
+ */
+function locationRowHtml(r: LocationRow, i: number | string): string {
+  return `<div class="pu-row pu-loc-row">
+          <select name="loc_type_${i}" aria-label="Kind"><option value="">—</option>${selectOptions(LOCATION_KINDS, r.type)}</select>
+          <input name="loc_value_${i}" maxlength="500" aria-label="Details" placeholder="Address, number or link" value="${escapeHtml(r.value)}">
+          <input name="loc_label_${i}" maxlength="80" aria-label="Label for the guest" placeholder="e.g. MIK office" value="${escapeHtml(r.label)}">
+          <button type="button" class="pu-row-remove" aria-label="Remove this location">×</button>
+        </div>`
+}
+
+/** One question row; same indexing as `locationRowHtml`. A row with no question is skipped. */
+function questionRowHtml(r: QuestionRow, i: number | string): string {
+  return `<div class="pu-row pu-q-row">
+          <input name="q_label_${i}" maxlength="200" aria-label="Question" placeholder="e.g. Property address" value="${escapeHtml(r.label)}">
+          <select name="q_type_${i}" aria-label="Answer type">${selectOptions(QUESTION_KINDS, r.type)}</select>
+          <input name="q_options_${i}" maxlength="1000" aria-label="Dropdown choices" placeholder="For a dropdown: A, B, C" value="${escapeHtml(r.options)}">
+          <label class="pu-row-check"><input type="checkbox" name="q_required_${i}" value="1"${r.required ? ' checked' : ''}> <span class="pu-sr-sm">Required</span></label>
+          <button type="button" class="pu-row-remove" aria-label="Remove this question">×</button>
+        </div>`
+}
+
+/**
+ * "Add" clones the row template under the next free index; "×" removes its
+ * row. Without JS the form still works: it always renders one blank row to
+ * fill in, and clearing a row's kind or question drops it on save.
+ */
+const ROW_EDITOR_SCRIPT = `document.addEventListener('click',function(e){var t=e.target;if(!(t instanceof Element))return;
+var add=t.closest('.pu-row-add');if(add){var box=document.getElementById(add.getAttribute('data-rows'));var tpl=document.getElementById(add.getAttribute('data-template'));
+var n=Number(box.getAttribute('data-next'))||box.children.length;box.setAttribute('data-next',String(n+1));
+box.insertAdjacentHTML('beforeend',tpl.innerHTML.replace(/__i__/g,String(n)));var f=box.lastElementChild.querySelector('input,select');if(f)f.focus();return}
+var rm=t.closest('.pu-row-remove');if(rm){var row=rm.closest('.pu-row');if(row)row.remove()}});`
 
 /**
  * Inputs in the order they appear on the page, so the first errored one can
@@ -744,6 +793,9 @@ export function eventTypeForm(d: EventTypeFormData): string {
 
   const num = (v: number | null | undefined, fallback: string): string =>
     v === null || v === undefined ? fallback : String(v)
+  // As typed when the form failed validation, else from the saved event type.
+  const locationRows = d.rows?.locations ?? locationRowsOf(et)
+  const questionRows = d.rows?.questions ?? questionRowsOf(et)
 
   // The address a guest will actually use: the OWNER's slug first, and the
   // owner is the team when there is one. The user's own slug there would
@@ -884,39 +936,30 @@ ${
 
     <fieldset class="pu-fs">
       <legend>Where</legend>
-      <label for="locationType">Location</label>
-      <select id="locationType" name="locationType"${describedBy('locationType', errors)}${autofocusAttr('locationType', errors)}>
-        ${LOCATION_OPTIONS.map(
-          (o) =>
-            `<option value="${o.value}"${(et?.locationType ?? 'google_meet') === o.value ? ' selected' : ''}>${escapeHtml(o.label)}</option>`,
-        ).join('\n        ')}
-      </select>
-      ${fieldError('locationType', errors)}
-
-      <div class="pu-loc-wrap">
-        <label for="locationValue">Location details</label>
-        <input id="locationValue" name="locationValue" maxlength="500"
-               value="${escapeHtml(et?.locationValue ?? '')}"${describedBy('locationValue', errors)}${autofocusAttr('locationValue', errors)}>
-        ${fieldError('locationValue', errors)}
-        <p class="pu-help">The meeting URL, phone number or address. Google Meet mints its own link.</p>
+      <p class="pu-help" style="margin-top:0">The first location is the default. With more than one, the guest chooses.
+        Leave the details of a phone call or in-person option blank to ask the guest for their number or address.</p>
+      <div class="pu-rows" id="loc-rows" data-next="${locationRows.length + 1}">
+        <div class="pu-row pu-row-head pu-loc-row" aria-hidden="true"><span>Kind</span><span>Details</span><span>Label for the guest (optional)</span><span></span></div>
+        ${[...locationRows, BLANK_LOCATION_ROW].map((r, i) => locationRowHtml(r, i)).join('\n        ')}
       </div>
-
-      <label for="locationOptions">More locations the guest can choose</label>
-      <textarea id="locationOptions" name="locationOptions" rows="3"${describedBy('locationOptions', errors)}${autofocusAttr('locationOptions', errors)}
-                placeholder="Phone&#10;In person | 1385 Coral Way, Suite 202, Miami&#10;In person">${escapeHtml(d.optionsText?.locations ?? formatLocationOptions(et?.locationOptions ?? []))}</textarea>
+      <template id="loc-row-template">${locationRowHtml(BLANK_LOCATION_ROW, '__i__')}</template>
+      <button type="button" class="pu-btn pu-btn-ghost pu-row-add" data-rows="loc-rows" data-template="loc-row-template">Add location</button>
       ${fieldError('locationOptions', errors)}
-      <p class="pu-help">One per line &mdash; Google Meet, Custom link, Phone or In person, then <code>|</code> and the details. Phone or In person with no details asks the guest for their number or address. Blank means the location above only. Prefill one with <code>?location=phone</code>, <code>meet</code>, <code>in-person</code> or its position, <code>?location=2</code>.</p>
+      <p class="pu-help">Prefill a choice on the link with <code>?location=phone</code>, <code>meet</code>, <code>in-person</code> or its position, <code>?location=2</code>.</p>
     </fieldset>
 
     <fieldset class="pu-fs">
       <legend>Questions</legend>
-      <label for="questions">Custom questions</label>
-      <textarea id="questions" name="questions" rows="5"${describedBy('questions', errors)}${autofocusAttr('questions', errors)}
-                placeholder="Company | text | required&#10;Topic | select | optional | Sales, Support">${escapeHtml(d.questionsText ?? formatQuestions(et?.questions ?? []))}</textarea>
+      <p class="pu-help" style="margin-top:0">Name and email are always asked and are not listed here.</p>
+      <div class="pu-rows" id="q-rows" data-next="${questionRows.length + 1}">
+        <div class="pu-row pu-row-head pu-q-row" aria-hidden="true"><span>Question</span><span>Answer type</span><span>Dropdown choices</span><span>Required</span><span></span></div>
+        ${[...questionRows, BLANK_QUESTION_ROW].map((r, i) => questionRowHtml(r, i)).join('\n        ')}
+      </div>
+      <template id="q-row-template">${questionRowHtml(BLANK_QUESTION_ROW, '__i__')}</template>
+      <button type="button" class="pu-btn pu-btn-ghost pu-row-add" data-rows="q-rows" data-template="q-row-template">Add question</button>
       ${fieldError('questions', errors)}
-      <p class="pu-help">One question per line &mdash; label, type, required?, options. Example above.
-        Name and email are always asked and are not listed here.</p>
     </fieldset>
+    <script>${ROW_EDITOR_SCRIPT}</script>
 
     <label for="active" style="display:flex;align-items:center;gap:.5rem;margin-top:1.25rem">
       <input id="active" name="active" type="checkbox" value="1" style="width:auto"
@@ -3162,7 +3205,7 @@ export function parseOverrides(text: string): DateOverride[] | null {
   return out
 }
 
-const QUESTION_TYPES: readonly EventTypeQuestion['type'][] = ['text', 'textarea', 'select']
+const QUESTION_TYPES: readonly EventTypeQuestion['type'][] = ['text', 'textarea', 'select', 'phone']
 
 export function formatQuestions(questions: EventTypeQuestion[]): string {
   return questions
@@ -3224,7 +3267,7 @@ function parseQuestionLines(text: string): EventTypeQuestion[] | QuestionsParseE
     if (label.length > 200) return fail('the label is over 200 characters')
 
     const type = (parts[1] ?? 'text') as EventTypeQuestion['type']
-    if (!QUESTION_TYPES.includes(type)) return fail(`the type must be text, textarea or select, not "${type}"`)
+    if (!QUESTION_TYPES.includes(type)) return fail(`the type must be text, textarea, select or phone, not "${type}"`)
 
     const requiredWord = (parts[2] ?? 'optional').toLowerCase()
     if (requiredWord !== 'required' && requiredWord !== 'optional') {

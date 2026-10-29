@@ -369,6 +369,22 @@ time,.pu-time{font-family:var(--pu-font-numeric);font-variant-numeric:tabular-nu
 .pu-radio input{width:auto;margin:0}
 .pu-radio-detail{margin:0 0 .5rem 1.6rem}
 .pu-radio:not(:has(input:checked)) + .pu-radio-detail{display:none}
+.pu-phone{display:flex;gap:.5rem}
+.pu-phone select{flex:0 0 auto;width:auto;max-width:12rem}
+.pu-phone input{flex:1;min-width:0}
+.pu-rows{display:grid;gap:.4rem;margin:.5rem 0 .25rem}
+.pu-row{display:grid;gap:.5rem;align-items:center}
+.pu-loc-row{grid-template-columns:9.5rem 1fr 12rem 2rem}
+.pu-q-row{grid-template-columns:1fr 11rem 1fr 4.5rem 2rem}
+.pu-row-head{font-size:.75rem;font-weight:600;color:var(--pu-text-secondary)}
+.pu-row input,.pu-row select{margin:0}
+.pu-row-check{display:flex;align-items:center;justify-content:center;gap:.35rem;margin:0;font-weight:400}
+.pu-row-check input{width:auto}
+.pu-sr-sm{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0)}
+.pu-row-remove{border:0;background:none;padding:0;font-size:1.25rem;line-height:1;cursor:pointer;color:var(--pu-text-secondary)}
+.pu-row-remove:hover{color:var(--pu-danger-text)}
+@media(max-width:640px){.pu-loc-row,.pu-q-row{grid-template-columns:1fr 1fr;padding:.5rem 0;border-bottom:1px solid var(--pu-line)}
+  .pu-row-head{display:none}.pu-sr-sm{position:static;width:auto;height:auto;clip:auto}}
 
 .pu-grid{display:grid;gap:1.5rem;grid-template-columns:1fr}
 @media(min-width:780px){.pu-grid{grid-template-columns:300px 1fr}}
@@ -727,7 +743,6 @@ input:has(+ .pu-err),select:has(+ .pu-err),textarea:has(+ .pu-err){border-color:
    that has some. Hidden here, ignored by the server either way
    (readEventTypeForm), so an old browser that shows them loses nothing. */
 form:has(#owner option[value=""]:checked) .pu-sched-wrap{display:none}
-form:has(#locationType option[value="google_meet"]:checked) .pu-loc-wrap{display:none}
 /* Hosts: one grid row per host — name, attendance or weight, schedule —
    stacking to a single column on a phone, where three table columns
    squeeze each control to a few characters. */

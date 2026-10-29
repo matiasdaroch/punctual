@@ -38,6 +38,7 @@ const et: EventType = {
   locationValue: null,
   durationOptions: [60, 45],
   locationOptions: [
+    { type: 'google_meet', value: null },
     { type: 'phone', value: null },
     { type: 'in_person', value: '1385 Coral Way, Suite 202' },
   ],

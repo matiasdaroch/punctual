@@ -27,7 +27,10 @@ export function durationChoices(et: EventType): number[] {
 
 /** Every location a guest may pick, the default first. */
 export function locationChoices(et: EventType): LocationOption[] {
-  const all: LocationOption[] = [{ type: et.locationType, value: et.locationValue }, ...(et.locationOptions ?? [])]
+  const all: LocationOption[] =
+    et.locationOptions && et.locationOptions.length > 0
+      ? et.locationOptions
+      : [{ type: et.locationType, value: et.locationValue }]
   const seen = new Set<string>()
   return all.filter((o) => {
     const key = `${o.type}\u0000${o.value ?? ''}`
@@ -59,7 +62,7 @@ export function withDuration(et: EventType, minutes: number): EventType {
 
 /** The event type as if `option` were its only location. */
 export function withLocation(et: EventType, option: LocationOption): EventType {
-  return { ...et, locationType: option.type, locationValue: option.value }
+  return { ...et, locationType: option.type, locationValue: option.value, locationOptions: [] }
 }
 
 /**
@@ -121,8 +124,9 @@ export function pickLocation(et: EventType, raw: string | null | undefined): num
   return i === -1 ? null : i
 }
 
-/** The short name a picker shows for an option. */
+/** The short name a picker shows for an option: the host's label, else one from the kind and details. */
 export function locationOptionLabel(option: LocationOption): string {
+  if (option.label) return option.label
   switch (option.type) {
     case 'google_meet':
       return 'Google Meet'

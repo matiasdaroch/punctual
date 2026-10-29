@@ -20,6 +20,7 @@ import { fitKeyFor, type LogoShape } from '../../core/domain/media.js'
 import type { CompanyLogo,
   Team, EventType, LocationType, Slot, User } from '../../core/domain/types.js'
 import { effectiveQuestions } from '../../core/domain/booking-service.js'
+import { CALLING_CODES, splitPhone } from '../../core/domain/phone.js'
 import {
   durationChoices,
   guestFieldLabel,
@@ -452,6 +453,26 @@ function durationPicker(d: BookingPageData): string {
   return `<nav class="pu-choices" aria-label="Meeting length">${links}</nav>`
 }
 
+// Built once per isolate, like the timezone options: nothing in it depends on the request.
+const CALLING_CODE_OPTIONS = CALLING_CODES.map(
+  (c) => `<option value="${c.iso}">${escapeHtml(c.name)} +${c.code}</option>`,
+).join('')
+
+/**
+ * A phone question: the country's calling code beside the number. Posted as
+ * `q_<id>__country` and `q_<id>`, which the router joins into one answer
+ * (core/domain/phone.ts). The label's `for` points at the number.
+ */
+function phoneField(id: string, value: string, req: string, desc: string): string {
+  const { iso, number } = splitPhone(value)
+  const options = CALLING_CODE_OPTIONS.replace(`value="${iso}">`, `value="${iso}" selected>`)
+  return `<span class="pu-phone">
+          <select name="q_${escapeHtml(id)}__country" aria-label="Country code" autocomplete="tel-country-code">${options}</select>
+          <input id="q-${escapeHtml(id)}" name="q_${escapeHtml(id)}" type="tel" autocomplete="tel-national" inputmode="tel"
+                 value="${escapeHtml(number)}"${req}${desc}>
+        </span>`
+}
+
 /** `&duration=…&location=…` for the guest's choices, appended to every internal link. */
 export function choiceQuery(d: Pick<BookingPageData, 'duration' | 'location'>): string {
   return (
@@ -759,7 +780,9 @@ export function confirmForm(
                    )
                    .join('')}
                </select>`
-            : `<input id="q-${escapeHtml(q.id)}" name="q_${escapeHtml(q.id)}" value="${val}"${req}${desc}>`
+            : q.type === 'phone'
+              ? phoneField(q.id, values[q.id] ?? '', req, desc)
+              : `<input id="q-${escapeHtml(q.id)}" name="q_${escapeHtml(q.id)}" value="${val}"${req}${desc}>`
       return `<label for="q-${escapeHtml(q.id)}">${escapeHtml(q.label)}${q.required ? '' : ' <span class="pu-muted">(optional)</span>'}</label>
         ${field}
         ${err ? `<p class="pu-err" id="err-${escapeHtml(q.id)}">${escapeHtml(err)}</p>` : ''}`

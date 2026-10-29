@@ -98,13 +98,15 @@ export type LocationType = 'google_meet' | 'custom_link' | 'phone' | 'in_person'
 export interface LocationOption {
   type: LocationType
   value: string | null
+  /** What the guest's picker calls it ("MIK office"); absent: a name from the kind and details. */
+  label?: string | null
 }
 export type SchedulingType = 'personal' | 'round_robin' | 'collective'
 
 export interface EventTypeQuestion {
   id: string
   label: string
-  type: 'text' | 'textarea' | 'select'
+  type: 'text' | 'textarea' | 'select' | 'phone'
   required: boolean
   options?: string[]
 }
@@ -159,9 +161,9 @@ export interface EventType {
    */
   durationOptions?: number[]
   /**
-   * Further locations a guest may pick, besides `locationType` /
-   * `locationValue` (the default, listed first). Empty or absent: the
-   * default only.
+   * Every location a guest may pick, the default first (it matches
+   * `locationType` / `locationValue`, which stay the default for older
+   * readers). Empty or absent: the default only (migration 0019).
    */
   locationOptions?: LocationOption[]
   questions: EventTypeQuestion[]

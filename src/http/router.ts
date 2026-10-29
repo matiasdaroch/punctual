@@ -40,6 +40,7 @@ import {
   withDuration,
 } from '../core/domain/booking-options.js'
 import { describeLocation } from '../core/ics.js'
+import { joinPhone } from '../core/domain/phone.js'
 import { hostUsers as hostUsers_, resolveHosts as resolveEventTypeHosts } from '../core/domain/hosts.js'
 import { isValidTimeZone, localDateString } from '../core/time/zone.js'
 import {
@@ -562,6 +563,14 @@ export function buildRouter(ports: EnginePorts, slots: SlotService): Hono<{ Bind
     const answers: Record<string, string> = {}
     for (const [k, v] of form.entries()) {
       if (k.startsWith('q_')) answers[k.slice(2)] = String(v)
+    }
+    // A phone question posts its country and its number separately; the
+    // answer is the two together (core/domain/phone.ts).
+    for (const [k, iso] of Object.entries(answers)) {
+      if (!k.endsWith('__country')) continue
+      const id = k.slice(0, -'__country'.length)
+      answers[id] = joinPhone(iso, answers[id] ?? '')
+      delete answers[k]
     }
 
     const data: BookingPageData = {

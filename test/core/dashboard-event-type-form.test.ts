@@ -142,7 +142,6 @@ describe('eventTypeForm — structure', () => {
   it('wraps the conditional columns for the stylesheet, with short option labels', () => {
     const html = eventTypeForm({ ...base, teams: [support], eventType })
     expect(html).toContain('class="pu-sched-wrap"')
-    expect(html).toContain('class="pu-loc-wrap"')
     expect(html).toContain('>Round robin</option>')
     expect(html).toContain('>Collective</option>')
     expect(html).toContain('Round robin: one host takes each booking. Collective: every host attends.')
@@ -159,10 +158,25 @@ describe('eventTypeForm — structure', () => {
     expect([...positions].sort((a, b) => a - b)).toEqual(positions)
   })
 
-  it('shows a worked example in the questions box', () => {
-    const html = eventTypeForm(base)
-    expect(control(html, 'questions')).toContain('placeholder="Company | text | required&#10;Topic | select | optional | Sales, Support"')
-    expect(html).toContain('One question per line &mdash; label, type, required?, options. Example above.')
+  it('edits locations and questions as rows, one blank row ready to fill', () => {
+    const html = eventTypeForm({
+      ...base,
+      eventType: {
+        ...eventType,
+        locationOptions: [
+          { type: 'google_meet', value: null },
+          { type: 'in_person', value: '1385 Coral Way', label: 'MIK office' },
+        ],
+        questions: [{ id: 'phone', label: 'Phone', type: 'phone', required: true }],
+      },
+    })
+    expect(html).toContain('name="loc_type_0"')
+    expect(html).toContain('value="MIK office"')
+    expect(html).toContain('name="loc_type_2"')
+    expect(html).toContain('<option value="phone" selected>Phone number</option>')
+    expect(html).toContain('name="q_required_0" value="1" checked')
+    expect(html).toContain('name="q_label_1"')
+    expect(html).toContain('id="q-row-template"')
   })
 })
 
@@ -193,7 +207,7 @@ describe('eventTypeForm — errors', () => {
 
   it('puts every field error right after its control, so the red-border rule applies to all of them', () => {
     const all: Record<string, string> = {}
-    for (const id of ['title', 'slug', 'description', 'owner', 'schedulingType', 'scheduleId', 'durationMinutes', 'maxPerDay', 'locationType', 'locationValue', 'questions']) all[id] = `bad ${id}`
+    for (const id of ['title', 'slug', 'description', 'owner', 'schedulingType', 'scheduleId', 'durationMinutes', 'maxPerDay']) all[id] = `bad ${id}`
     const html = eventTypeForm({
       ...base,
       eventType: teamEvent,
@@ -368,7 +382,7 @@ describe('eventTypeForm — hosts editor', () => {
 describe('custom questions — parse errors name the line', () => {
   it('quotes the offending line and says what is wrong with it', () => {
     const text = 'Company | text | required\nTopic | dropdown | optional'
-    expect(questionsParseError(text)).toBe('Line 2 ("Topic | dropdown | optional"): the type must be text, textarea or select, not "dropdown"')
+    expect(questionsParseError(text)).toBe('Line 2 ("Topic | dropdown | optional"): the type must be text, textarea, select or phone, not "dropdown"')
     expect(parseQuestions(text)).toBeNull()
   })
 

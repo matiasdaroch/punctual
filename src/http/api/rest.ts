@@ -312,7 +312,7 @@ const slugSchema = z
 const questionSchema = z.object({
   id: z.string().min(1).max(64),
   label: z.string().min(1).max(200),
-  type: z.enum(['text', 'textarea', 'select']),
+  type: z.enum(['text', 'textarea', 'select', 'phone']),
   required: z.boolean().default(false),
   options: z.array(z.string().min(1).max(200)).max(50).optional(),
 })

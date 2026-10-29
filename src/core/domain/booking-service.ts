@@ -28,6 +28,7 @@ import type { BucketClaim } from '../../ports.js'
 import { bookingFootprint, isSlotStillValid, type HostAvailabilityInput } from '../slots/engine.js'
 import { intervalToBuckets } from '../slots/intervals.js'
 import { localDateString } from '../time/zone.js'
+import { isValidPhone } from './phone.js'
 
 export interface BookingRequest {
   eventType: EventType
@@ -436,6 +437,9 @@ export function validateAnswers(
     }
     if (v !== '' && q.type === 'select' && q.options && !q.options.includes(v)) {
       errors[q.id] = 'Not one of the available options'
+    }
+    if (v !== '' && q.type === 'phone' && !isValidPhone(v)) {
+      errors[q.id] = 'Please enter a valid phone number'
     }
     if (v.length > 2000) errors[q.id] = 'Too long (max 2000 characters)'
   }

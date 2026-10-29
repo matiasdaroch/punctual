@@ -29,13 +29,13 @@
  *     each write.
  */
 
+import { MAX_DURATION_OPTIONS, forBooking, parseDurationOptions } from '../core/domain/booking-options.js'
 import {
-  MAX_DURATION_OPTIONS,
-  MAX_LOCATION_OPTIONS,
-  forBooking,
-  parseDurationOptions,
-  parseLocationOptions,
-} from '../core/domain/booking-options.js'
+  locationsFromRows,
+  questionsFromRows,
+  readRows,
+  type EventTypeRows,
+} from '../core/domain/event-type-rows.js'
 import { Hono, type Context, type MiddlewareHandler } from 'hono'
 import { notifyBookingCancelled, notifyWebhooks } from '../adapters/notify.js'
 import { dispatchConfirmation } from '../adapters/queue/consumer.js'
@@ -122,7 +122,6 @@ import {
   loginPage,
   manageLinkErrorPage,
   parseOverrides,
-  parseQuestions,
   questionsParseError,
   parseWeeklyDraft,
   adminPage,
@@ -812,6 +811,7 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
           eventType: draft,
           questionsText,
           optionsText,
+          rows: optionsText.rows,
           errors,
           teams: await managedTeams(c),
           schedules: await repos.availability.listForUser(user.id),
@@ -899,6 +899,7 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
           eventType: draft,
           questionsText: read.questionsText,
           optionsText: read.optionsText,
+          rows: read.optionsText.rows,
           teams: await managedTeams(c),
           schedules: await repos.availability.listForUser(user.id),
           hostChoices: drafted,
@@ -920,6 +921,7 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
           eventType: draft,
           questionsText: read.questionsText,
           optionsText: read.optionsText,
+          rows: read.optionsText.rows,
           errors,
           teams: await managedTeams(c),
           schedules: await repos.availability.listForUser(user.id),
@@ -947,6 +949,7 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
             eventType: draft,
             questionsText: read.questionsText,
             optionsText: read.optionsText,
+            rows: read.optionsText.rows,
             errors: { hosts: 'A host is no longer on the team, or a schedule was deleted. Reload the page and try again.' },
             teams: await managedTeams(c),
             schedules: await repos.availability.listForUser(user.id),
@@ -3674,12 +3677,14 @@ function readEventTypeForm(
   }
 
   const title = text('title')
-  const questionsText = String(form.get('questions') ?? '')
-  const optionsText: EventTypeOptionsText = {
-    durations: text('durationOptions'),
-    locations: String(form.get('locationOptions') ?? ''),
-  }
-  const parsedLocations = parseLocationOptions(optionsText.locations)
+  // The questions now come from the row editor; the text form is gone, and
+  // an empty text always parses (validateEventType still reads it).
+  const questionsText = ''
+  const optionsText: EventTypeOptionsText = { durations: text('durationOptions'), rows: readRows(form) }
+  const parsedLocations = locationsFromRows(optionsText.rows.locations)
+  const parsedQuestions = questionsFromRows(optionsText.rows.questions)
+  const locations = 'options' in parsedLocations ? parsedLocations.options : []
+  const first = locations[0] ?? { type: 'google_meet' as const, value: null }
   // Exactly one owner is ever set. The scheduling select is always rendered
   // (no JS hides it), so its value is IGNORED for a personal event — the
   // server forces 'personal', and a crafted round_robin on owner=me cannot
@@ -3703,13 +3708,16 @@ function readEventTypeForm(
     minNoticeMinutes: int('minNoticeMinutes', 0),
     maxHorizonDays: int('maxHorizonDays', 60),
     maxPerDay: optionalInt('maxPerDay'),
-    locationType: locationTypeOf(text('locationType')),
-    locationValue: text('locationValue') || null,
-    // Unparseable text leaves these empty here; validateEventType reports
-    // it, and the form refills from `optionsText`, not from these.
+    // The first location row is the default, kept in its own columns for
+    // older readers; the full list goes in locationOptions when there is a
+    // choice or a label to keep (core/domain/booking-options.ts).
+    locationType: first.type,
+    locationValue: first.value,
+    // Rows that failed validation leave these empty here; validateEventType
+    // reports it, and the form refills from `optionsText`, not from these.
     durationOptions: parseDurationOptions(optionsText.durations) ?? [],
-    locationOptions: 'options' in parsedLocations ? parsedLocations.options : [],
-    questions: parseQuestions(questionsText) ?? [],
+    locationOptions: locations.length > 1 || locations.some((o) => o.label) ? locations : [],
+    questions: 'questions' in parsedQuestions ? parsedQuestions.questions : [],
     active: form.get('active') !== null,
     createdAt: 0,
     // Same reasoning as `schedulingType` above: the select always renders,
@@ -3721,17 +3729,17 @@ function readEventTypeForm(
 }
 
 /**
- * The guest-choice fields (other durations, more locations) as typed, so a
- * form that failed validation refills with the host's text, not a re-format
- * of whatever parsed.
+ * The other-durations field and the location and question rows as posted,
+ * so a form that failed validation refills with what the host entered, not
+ * a re-format of whatever parsed.
  */
 export interface EventTypeOptionsText {
   durations: string
-  locations: string
+  rows: EventTypeRows
 }
 
 /** Field errors for the guest-choice fields (core/domain/booking-options.ts). */
-function validateEventTypeOptions(draft: EventType, text: EventTypeOptionsText): Record<string, string> {
+function validateEventTypeOptions(text: EventTypeOptionsText): Record<string, string> {
   const errors: Record<string, string> = {}
   const durations = parseDurationOptions(text.durations)
   if (durations === null) {
@@ -3741,16 +3749,11 @@ function validateEventTypeOptions(draft: EventType, text: EventTypeOptionsText):
   } else if (durations.length > MAX_DURATION_OPTIONS) {
     errors['durationOptions'] = `Up to ${MAX_DURATION_OPTIONS} other durations`
   }
-  const locations = parseLocationOptions(text.locations)
+  const locations = locationsFromRows(text.rows.locations)
   if ('error' in locations) errors['locationOptions'] = locations.error
-  else if (locations.options.length > MAX_LOCATION_OPTIONS) {
-    errors['locationOptions'] = `Up to ${MAX_LOCATION_OPTIONS} more locations`
-  } else if (locations.options.some((o) => o.type === 'custom_link' && o.value !== null && !isHttpUrl(o.value))) {
-    errors['locationOptions'] = 'A custom link must be a full http(s) URL'
-  }
-  if (draft.locationType === 'custom_link' && !draft.locationValue && (draft.locationOptions ?? []).length > 0) {
-    errors['locationValue'] = 'Give the custom link its URL'
-  }
+  else if (locations.options.length === 0) errors['locationOptions'] = 'Add at least one location'
+  const questions = questionsFromRows(text.rows.questions)
+  if ('error' in questions) errors['questions'] = questions.error
   return errors
 }
 
@@ -3771,10 +3774,6 @@ function isHttpUrl(value: string): boolean {
   }
 }
 
-function locationTypeOf(value: string): EventType['locationType'] {
-  return value === 'custom_link' || value === 'phone' || value === 'in_person' ? value : 'google_meet'
-}
-
 /**
  * Field-level validation for an event type.
  *
@@ -3788,9 +3787,9 @@ async function validateEventType(
   draft: EventType,
   questionsText: string,
   currentId: string | null,
-  optionsText: EventTypeOptionsText = { durations: '', locations: '' },
+  optionsText: EventTypeOptionsText = { durations: '', rows: { locations: [{ type: draft.locationType, value: draft.locationValue ?? '', label: '' }], questions: [] } },
 ): Promise<Record<string, string>> {
-  const errors: Record<string, string> = validateEventTypeOptions(draft, optionsText)
+  const errors: Record<string, string> = validateEventTypeOptions(optionsText)
 
   if (draft.title === '' || draft.title.length > 120) errors['title'] = 'Give it a title (up to 120 characters)'
 

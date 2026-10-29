@@ -498,7 +498,7 @@ describe('event types — form', () => {
     expect(html).toContain('Fix the 4 fields marked below.')
     expect(html).toMatch(/<input id="title"[^>]* autofocus>/)
     expect(html.match(/ autofocus/g)).toHaveLength(1)
-    expect(html).toContain('Line 2 (&quot;Topic | dropdown&quot;): the type must be text, textarea or select, not &quot;dropdown&quot;')
+    expect(html).toContain('Line 2 (&quot;Topic | dropdown&quot;): the type must be text, textarea, select or phone, not &quot;dropdown&quot;')
     // The typed text comes back for correction, not the empty parse result.
     expect(html).toContain('Topic | dropdown</textarea>')
   })
