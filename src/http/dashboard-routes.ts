@@ -2250,6 +2250,7 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
    * Returns the THUMBNAIL key, the only one a page ever references.
    */
   async function storeUploadedImage(file: string | File | null): Promise<{ ok: true; key: string } | { ok: false; message: string }> {
+    if (ports.config.uploadsUnavailable) return { ok: false, message: 'Image uploads aren’t set up on this server yet (no R2 storage bucket).' }
     if (!(file instanceof File) || file.size === 0) return { ok: false, message: 'Choose an image to upload' }
     if (file.size > MAX_UPLOAD_BYTES) return { ok: false, message: 'That file is larger than 5 MB' }
     if (!isAllowedImageType(file.type)) return { ok: false, message: 'PNG, JPEG or WebP images only' }

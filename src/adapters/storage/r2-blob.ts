@@ -24,3 +24,19 @@ export function createR2BlobStorage(bucket: R2Bucket): BlobStorage {
     },
   }
 }
+
+/**
+ * Stands in when no R2 bucket is bound: nothing is stored, so every read
+ * misses, and a write throws. The upload routes check
+ * `config.uploadsUnavailable` first and never reach `put`.
+ */
+export function createMissingBlobStorage(): BlobStorage {
+  return {
+    async get() {
+      return null
+    },
+    async put() {
+      throw new Error('No R2 bucket is bound (AVATARS); uploads are unavailable')
+    },
+  }
+}

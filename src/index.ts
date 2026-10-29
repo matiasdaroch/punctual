@@ -14,7 +14,7 @@ import { createD1Repositories } from './adapters/d1/repositories.js'
 import { createWebCrypto } from './adapters/crypto/webcrypto.js'
 import { createKvCache } from './adapters/cache/kv.js'
 import { createKvBlobCache } from './adapters/cache/kv-blob.js'
-import { createR2BlobStorage } from './adapters/storage/r2-blob.js'
+import { createMissingBlobStorage, createR2BlobStorage } from './adapters/storage/r2-blob.js'
 import { createBrevoSender, createCloudflareSender, createConsoleSender, createResendSender } from './adapters/email/index.js'
 import { selectEmailDelivery } from './adapters/email/select.js'
 import { createAnalyticsEngineInsights } from './adapters/insights/analytics-engine.js'
@@ -36,6 +36,7 @@ export interface Env {
   DB: D1Database
   CACHE: KVNamespace
   /** Host avatars and team logos — see `ports.ts`'s `BlobStorage` doc comment. */
+  /** Typed as required for the tests; a deployment may leave it unbound, and then uploads are refused with a clear message. */
   AVATARS: R2Bucket
   HOST_CALENDAR: DurableObjectNamespace
   RATE_LIMITER: DurableObjectNamespace
@@ -114,7 +115,7 @@ export function buildPorts(env: Env): EnginePorts {
   const oauth = createEnvOAuthCredentials(env, baseUrl)
   const cache = createKvCache(env.CACHE)
   const blobCache = createKvBlobCache(env.CACHE)
-  const blobStorage = createR2BlobStorage(env.AVATARS)
+  const blobStorage = env.AVATARS ? createR2BlobStorage(env.AVATARS) : createMissingBlobStorage()
   const clock = { now: () => Date.now() }
 
   const repositories = (scope: RequestScope) => createD1Repositories(env.DB, scope)
@@ -215,6 +216,7 @@ export function buildPorts(env: Env): EnginePorts {
       ...(env.GA_MEASUREMENT_ID ? { analyticsId: env.GA_MEASUREMENT_ID } : {}),
       ...(env.SIGNUPS ? { signupPolicy: parseSignupPolicy(env.SIGNUPS) } : {}),
       supportEmail: env.SUPPORT_EMAIL ?? 'hello@example.com',
+      ...(env.AVATARS ? {} : { uploadsUnavailable: true }),
       ...(env.LEGAL_EMAIL ? { legalEmail: env.LEGAL_EMAIL } : {}),
       fromEmail: env.FROM_EMAIL ?? 'hello@example.com',
       fromName: env.FROM_NAME ?? 'Punctual',

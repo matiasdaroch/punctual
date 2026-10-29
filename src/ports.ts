@@ -911,6 +911,8 @@ export interface EngineConfig {
   supportEmail: string
   /** The contact on /privacy and /terms (LEGAL_EMAIL); supportEmail when unset. */
   legalEmail?: string
+  /** True when no R2 bucket is bound, so photo and logo uploads are refused up front. */
+  uploadsUnavailable?: boolean
   fromEmail: string
   fromName: string
   /**
