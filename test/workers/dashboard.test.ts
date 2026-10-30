@@ -582,6 +582,19 @@ describe('event types — an admin acting for someone else', () => {
     expect(html).toContain(`href="/dashboard/event-types/${MEMBER_EVENT}"`)
   })
 
+  it('offers "New for them" on the home page and "New event" per person on the admin page, to admins only', async () => {
+    const admin = await seedSession(ADMIN_ID)
+    const home = await (await get('/dashboard', admin)).text()
+    expect(home).toContain('<form method="get" action="/dashboard/event-types/new"')
+    expect(home).toContain(`<option value="${HOST_ID}">Test Host</option>`)
+    const adminPage = await (await get('/dashboard/admin', admin)).text()
+    expect(adminPage).toContain(`href="/dashboard/event-types/new?for=${HOST_ID}"`)
+    expect(adminPage).not.toContain(`href="/dashboard/event-types/new?for=${ADMIN_ID}"`)
+
+    const memberHome = await (await get('/dashboard', await seedSession(HOST_ID))).text()
+    expect(memberHome).not.toContain('New for them')
+  })
+
   it("opens a member's event type for editing, owned by them, with their link", async () => {
     const res = await get(`/dashboard/event-types/${MEMBER_EVENT}`, await seedSession(ADMIN_ID))
     expect(res.status).toBe(200)

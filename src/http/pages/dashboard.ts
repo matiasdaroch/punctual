@@ -369,6 +369,8 @@ export interface DashboardHomeData extends DashboardChrome {
   hasCalendarConnection: boolean
   /** The host's default schedule — null only if the login backfill has not run yet. */
   defaultSchedule: Schedule | null
+  /** Everyone else, for an instance admin's "New event type for…" picker. Absent for members. */
+  people?: User[]
 }
 
 export function dashboardHome(d: DashboardHomeData): string {
@@ -391,7 +393,10 @@ export function dashboardHome(d: DashboardHomeData): string {
   <section aria-label="Event types">
     <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-bottom:.75rem">
       <h1 style="margin:0">Event types</h1>
-      <a class="pu-btn" href="/dashboard/event-types/new">New event type</a>
+      <div style="display:flex;gap:.5rem;flex-wrap:wrap;align-items:center">
+        ${newForSomeone(d.people ?? [])}
+        <a class="pu-btn" href="/dashboard/event-types/new">New event type</a>
+      </div>
     </div>
     <div style="display:grid;gap:1rem">${events}</div>
   </section>
@@ -422,6 +427,22 @@ export function dashboardHome(d: DashboardHomeData): string {
  * timezone but UTC: UTC is what the backfill falls back to when nothing told
  * it where the host is, so anything else means someone actually chose it.
  */
+/**
+ * An admin's shortcut to an event type for someone else: a plain GET form,
+ * so it works without JS, landing on the new-event form with them picked.
+ */
+function newForSomeone(people: User[]): string {
+  if (people.length === 0) return ''
+  const options = people
+    .map((p) => `<option value="${escapeHtml(p.id)}">${escapeHtml(p.name || p.slug)}</option>`)
+    .join('')
+  return `<form method="get" action="/dashboard/event-types/new" style="display:flex;gap:.5rem;margin:0">
+          <label for="new-for" class="pu-sr">New event type for</label>
+          <select id="new-for" name="for" style="width:auto;margin:0">${options}</select>
+          <button class="pu-btn pu-btn-ghost" type="submit">New for them</button>
+        </form>`
+}
+
 function setupChecklist(d: DashboardHomeData): string {
   const schedule = d.defaultSchedule
   const steps: Array<{ href: string; label: string; detail: string; done: boolean }> = [
@@ -3537,7 +3558,13 @@ export function adminPage(d: AdminPageData): string {
         <td>${u.role === 'admin' ? '<span class="pu-badge">Admin</span>' : '<span class="pu-muted">Member</span>'}</td>
         <td><div style="display:flex;gap:.4rem;align-items:center">
           <a class="pu-btn pu-btn-ghost" href="/dashboard/admin/users/${encodeURIComponent(u.id)}/edit"
-             style="padding:.3rem .6rem;font-size:.8125rem;white-space:nowrap">Edit</a>${action}</div></td>
+             style="padding:.3rem .6rem;font-size:.8125rem;white-space:nowrap">Edit</a>${
+            isSelf
+              ? ''
+              : `
+          <a class="pu-btn pu-btn-ghost" href="/dashboard/event-types/new?for=${encodeURIComponent(u.id)}"
+             style="padding:.3rem .6rem;font-size:.8125rem;white-space:nowrap">New event</a>`
+          }${action}</div></td>
       </tr>`
     })
     .join('\n')

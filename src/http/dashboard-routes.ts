@@ -593,9 +593,11 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
 
     // An instance admin also manages everyone else's personal event types:
     // listed after their own and the teams', badged with whose they are.
+    const people: User[] = []
     if (user.role === 'admin') {
       for (const other of await repos.users.listAll()) {
         if (other.id === user.id) continue
+        people.push(other)
         for (const eventType of await repos.eventTypes.listForUser(other.id)) {
           eventTypes.push({ eventType, ownerSlug: other.slug, personName: other.name || other.slug })
         }
@@ -629,6 +631,7 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
         baseUrl: ports.config.baseUrl,
         hasCalendarConnection,
         defaultSchedule,
+        ...(people.length > 0 ? { people } : {}),
       }),
     )
   })
