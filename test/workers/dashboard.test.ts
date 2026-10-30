@@ -8,7 +8,7 @@
  */
 
 import { env } from 'cloudflare:test'
-import { beforeAll, describe, expect, it } from 'vitest'
+import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 
 import { buildDashboardRoutes } from '../../src/http/dashboard-routes.js'
 import { buildRouter } from '../../src/http/router.js'
@@ -540,6 +540,110 @@ describe('event types — form', () => {
       { type: 'in_person', value: '1385 Coral Way', label: 'MIK office' },
     ])
     expect(JSON.parse(saved.questions_json)).toEqual([{ id: 'phone', label: 'Phone', type: 'phone', required: true }])
+  })
+})
+
+describe('event types — an admin acting for someone else', () => {
+  const ADMIN_ID = 'usr_admin_et'
+  const MEMBER_EVENT = 'evt_member_owned'
+
+  // The admin tests further down count admins on this shared database.
+  afterAll(async () => {
+    await db.prepare("UPDATE users SET role = 'member' WHERE id = ?").bind(ADMIN_ID).run()
+  })
+
+  beforeAll(async () => {
+    await db
+      .prepare("INSERT INTO users (id,email,name,tz,slug,role,created_at) VALUES (?,?,?,?,?,'admin',?)")
+      .bind(ADMIN_ID, 'admin-et@example.test', 'Ada Admin', 'UTC', 'ada-admin', NOW)
+      .run()
+    await db
+      .prepare(
+        `INSERT INTO event_types
+         (id,owner_user_id,owner_team_id,scheduling_type,slug,title,description,duration_minutes,
+          slot_interval_minutes,buffer_before_minutes,buffer_after_minutes,min_notice_minutes,
+          max_horizon_days,max_per_day,location_type,location_value,questions_json,active,created_at)
+         VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+      )
+      .bind(MEMBER_EVENT, HOST_ID, null, 'personal', 'site-visit', 'Site visit', '', 60, null, 0, 0, 0, 60, null,
+        'google_meet', null, '[]', 1, NOW)
+      .run()
+  })
+
+  async function csrfFor(cookie: string): Promise<string> {
+    const page = await get('/dashboard/event-types/new', cookie)
+    return /name="csrf" value="([^"]+)"/.exec(await page.text())?.[1] ?? ''
+  }
+
+  it("lists a member's event types on the admin's home, with whose they are and an Edit link", async () => {
+    const html = await (await get('/dashboard', await seedSession(ADMIN_ID))).text()
+    expect(html).toContain('Site visit')
+    expect(html).toContain('<span class="pu-badge pu-badge-neutral">Test Host</span>')
+    expect(html).toContain(`href="/dashboard/event-types/${MEMBER_EVENT}"`)
+  })
+
+  it("opens a member's event type for editing, owned by them, with their link", async () => {
+    const res = await get(`/dashboard/event-types/${MEMBER_EVENT}`, await seedSession(ADMIN_ID))
+    expect(res.status).toBe(200)
+    const html = await res.text()
+    expect(html).toContain('For Test Host, as an admin.')
+    expect(html).toContain(`<option value="user:${HOST_ID}" selected>Test Host (personal)</option>`)
+    expect(html).toContain('<code>/test-host/site-visit</code>')
+  })
+
+  it('saves the edit without taking the event type over', async () => {
+    const cookie = await seedSession(ADMIN_ID)
+    const res = await post(
+      `/dashboard/event-types/${MEMBER_EVENT}`,
+      { title: 'Site visit (2h)', slug: 'site-visit', durationMinutes: '120', active: '1', csrf: await csrfFor(cookie) },
+      cookie,
+    )
+    expect(res.status).toBe(302)
+    const row = await db
+      .prepare('SELECT owner_user_id, title, duration_minutes FROM event_types WHERE id = ?')
+      .bind(MEMBER_EVENT)
+      .first<{ owner_user_id: string; title: string; duration_minutes: number }>()
+    expect(row).toEqual({ owner_user_id: HOST_ID, title: 'Site visit (2h)', duration_minutes: 120 })
+  })
+
+  it('creates an event type for a member, under their slug', async () => {
+    const cookie = await seedSession(ADMIN_ID)
+    const form = await (await get(`/dashboard/event-types/new?for=${HOST_ID}`, cookie)).text()
+    expect(form).toContain(`<option value="user:${HOST_ID}" selected>Test Host (personal)</option>`)
+    const res = await post(
+      '/dashboard/event-types',
+      { title: 'Walkthrough', slug: 'walkthrough', durationMinutes: '30', active: '1', owner: `user:${HOST_ID}`, csrf: await csrfFor(cookie) },
+      cookie,
+    )
+    expect(res.status).toBe(302)
+    const row = await db.prepare('SELECT owner_user_id FROM event_types WHERE slug = ?').bind('walkthrough').first<{ owner_user_id: string }>()
+    expect(row?.owner_user_id).toBe(HOST_ID)
+  })
+
+  it('refuses a member who names someone else as the owner, and hides their event types from them', async () => {
+    const cookie = await seedSession(HOST_ID)
+    const memberForm = await (await get(`/dashboard/event-types/new?for=${ADMIN_ID}`, cookie)).text()
+    expect(memberForm).not.toContain('value="user:')
+    expect(memberForm).not.toContain('as an admin')
+    expect(memberForm).not.toContain('Ada Admin')
+    expect(await (await get('/dashboard', cookie)).text()).not.toContain('Ada Admin')
+    const res = await post(
+      '/dashboard/event-types',
+      { title: 'Takeover', slug: 'takeover', durationMinutes: '30', active: '1', owner: `user:${ADMIN_ID}`, csrf: await csrfFor(cookie) },
+      cookie,
+    )
+    expect(res.status).toBe(400)
+    expect(await res.text()).toContain('Only an admin can create event types for someone else')
+    expect(await db.prepare('SELECT id FROM event_types WHERE slug = ?').bind('takeover').first()).toBeNull()
+
+    const adminCookie = await seedSession(ADMIN_ID)
+    await post(
+      '/dashboard/event-types',
+      { title: 'Admin only', slug: 'admin-only', durationMinutes: '30', active: '1', csrf: await csrfFor(adminCookie) },
+      adminCookie,
+    )
+    const adminEvent = await db.prepare('SELECT id FROM event_types WHERE slug = ?').bind('admin-only').first<{ id: string }>()
+    expect((await get(`/dashboard/event-types/${adminEvent!.id}`, cookie)).status).toBe(404)
   })
 })
 

@@ -591,6 +591,17 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
       }
     }
 
+    // An instance admin also manages everyone else's personal event types:
+    // listed after their own and the teams', badged with whose they are.
+    if (user.role === 'admin') {
+      for (const other of await repos.users.listAll()) {
+        if (other.id === user.id) continue
+        for (const eventType of await repos.eventTypes.listForUser(other.id)) {
+          eventTypes.push({ eventType, ownerSlug: other.slug, personName: other.name || other.slug })
+        }
+      }
+    }
+
     const bookings = await repos.bookings.listForHost(user.id, {
       start: now,
       end: now + UPCOMING_WINDOW_MS,
@@ -635,8 +646,7 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
         csrf: c.get('csrf'),
         emailDelivery,
         ...(emailProblem ? { emailProblem } : {}),
-        teams: await managedTeams(c),
-        schedules: await c.get('repos').availability.listForUser(c.get('user').id),
+        ...(await ownerChoices(c, c.req.query('for'))),
       }),
     ),
   )
@@ -652,8 +662,7 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
         emailDelivery,
         ...(emailProblem ? { emailProblem } : {}),
         eventType,
-        teams: await managedTeams(c),
-        schedules: await c.get('repos').availability.listForUser(c.get('user').id),
+        ...(await ownerChoices(c, eventType.ownerUserId)),
         hostChoices: await hostChoicesFor(c, eventType),
         ...(c.req.query('created')
           ? { notice: 'Event type created. Every team member hosts it for now — adjust the hosts below if you want a subset.' }
@@ -822,15 +831,14 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
           optionsText,
           rows: optionsText.rows,
           errors,
-          teams: await managedTeams(c),
-          schedules: await repos.availability.listForUser(user.id),
+          ...(await ownerChoices(c, draft.ownerUserId)),
         }),
         400,
       )
     }
 
     const created = await repos.eventTypes.create({ ...draft, id: `evt_${ports.crypto.randomToken(12)}` })
-    await saveMainEvent(repos, user, created, form)
+    await saveMainEvent(repos, await personalOwner(c, created.ownerUserId), created, form)
     await advanceBookmark(c)
     if (created.ownerTeamId) {
       // Every member hosts a new team event type until the admin narrows
@@ -856,7 +864,9 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
 
     const user = c.get('user')
     const repos = c.get('repos')
-    const read = readEventTypeForm(form, user.id)
+    // A form without an owner choice keeps the event type where it is, so an
+    // admin saving someone else's event type does not take it over.
+    const read = readEventTypeForm(form, existing.ownerUserId ?? user.id)
     const draft = { ...read.draft, id: existing.id, createdAt: existing.createdAt }
     const errors = await validateEventType(repos, user, draft, read.questionsText, existing.id, read.optionsText)
 
@@ -910,8 +920,7 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
           questionsText: read.questionsText,
           optionsText: read.optionsText,
           rows: read.optionsText.rows,
-          teams: await managedTeams(c),
-          schedules: await repos.availability.listForUser(user.id),
+          ...(await ownerChoices(c, draft.ownerUserId)),
           hostChoices: drafted,
           ...(notice ? { notice } : {}),
         }),
@@ -933,8 +942,7 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
           optionsText: read.optionsText,
           rows: read.optionsText.rows,
           errors,
-          teams: await managedTeams(c),
-          schedules: await repos.availability.listForUser(user.id),
+          ...(await ownerChoices(c, draft.ownerUserId)),
           hostChoices: choices,
         }),
         400,
@@ -943,7 +951,12 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
 
     const before = new Set(choices.filter((ch) => ch.selected).map((ch) => ch.user.id))
     await repos.eventTypes.update(existing.id, draft)
-    await saveMainEvent(repos, user, { ...draft, id: existing.id }, form)
+    if (existing.ownerUserId && existing.ownerUserId !== draft.ownerUserId) {
+      // Handed to someone else (or a team): it can no longer be the old owner's main link.
+      const previous = await repos.users.byId(existing.ownerUserId)
+      if (previous?.mainEventTypeId === existing.id) await repos.users.update(previous.id, { mainEventTypeId: null })
+    }
+    await saveMainEvent(repos, await personalOwner(c, draft.ownerUserId), { ...draft, id: existing.id }, form)
     if (draft.ownerTeamId !== null) {
       // Atomic replace, guarded in SQL: a host who left the team or a
       // schedule deleted since the page loaded fails the whole set, and the
@@ -962,8 +975,7 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
             optionsText: read.optionsText,
             rows: read.optionsText.rows,
             errors: { hosts: 'A host is no longer on the team, or a schedule was deleted. Reload the page and try again.' },
-            teams: await managedTeams(c),
-            schedules: await repos.availability.listForUser(user.id),
+            ...(await ownerChoices(c, draft.ownerUserId)),
             hostChoices: await hostChoicesFor(c, draft),
           }),
           409,
@@ -989,8 +1001,7 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
       emailDelivery,
         ...(emailProblem ? { emailProblem } : {}),
       eventType,
-      teams: await managedTeams(c),
-      schedules: await c.get('repos').availability.listForUser(c.get('user').id),
+      ...(await ownerChoices(c, eventType.ownerUserId)),
       hostChoices: await hostChoicesFor(c, eventType),
     }
   }
@@ -1052,8 +1063,7 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
           emailDelivery,
         ...(emailProblem ? { emailProblem } : {}),
           eventType: existing,
-          teams: await managedTeams(c),
-          schedules: await c.get('repos').availability.listForUser(c.get('user').id),
+          ...(await ownerChoices(c, existing.ownerUserId)),
           // The message below tells the admin to untick "Visible" on THIS
           // form and save; without the Hosts block that save would read
           // every host as unticked and 400.
@@ -1082,6 +1092,8 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
     if (!found) return null
     const user = c.get('user')
     if (found.ownerUserId === user.id) return found
+    // An instance admin manages everyone's personal event types too.
+    if (found.ownerUserId && user.role === 'admin') return found
     if (found.ownerTeamId && (await managesTeam(c, found.ownerTeamId))) return found
     return null
   }
@@ -1127,6 +1139,38 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
       if (team) teams.push(team)
     }
     return teams
+  }
+
+  /**
+   * Whose personal event types these are: `ownerUserId`'s when an instance
+   * admin is acting for someone else, otherwise the signed-in user. Anyone
+   * else naming another user gets themselves back — validateEventType is
+   * what refuses a crafted owner, this only picks whose schedules to show.
+   */
+  async function personalOwner(c: Ctx, ownerUserId: string | null | undefined): Promise<User> {
+    const me = c.get('user')
+    if (!ownerUserId || ownerUserId === me.id || me.role !== 'admin') return me
+    return (await c.get('repos').users.byId(ownerUserId)) ?? me
+  }
+
+  /**
+   * The event-type form's owner choices: the teams the user can put it
+   * under, the owner's schedules, and for an instance admin every person,
+   * so they can create and edit event types on anyone's behalf.
+   */
+  async function ownerChoices(
+    c: Ctx,
+    ownerUserId: string | null | undefined,
+  ): Promise<Pick<EventTypeFormData, 'teams' | 'schedules' | 'owners' | 'forUser'>> {
+    const me = c.get('user')
+    const repos = c.get('repos')
+    const owner = await personalOwner(c, ownerUserId)
+    return {
+      teams: await managedTeams(c),
+      schedules: await repos.availability.listForUser(owner.id),
+      ...(me.role === 'admin' ? { owners: await repos.users.listAll() } : {}),
+      ...(owner.id !== me.id ? { forUser: owner } : {}),
+    }
   }
 
   // ===========================================================================
@@ -3831,12 +3875,16 @@ function readEventTypeForm(
   // server forces 'personal', and a crafted round_robin on owner=me cannot
   // land. Whether the user may act for the named team is validateEventType's
   // job, not this reader's.
-  const ownerTeamId = text('owner') || null
+  // `user:<id>` names a person (an instance admin's choice, checked in
+  // validateEventType); empty is `ownerUserId`; anything else is a team id.
+  const ownerField = text('owner')
+  const personId = ownerField.startsWith('user:') ? ownerField.slice('user:'.length) : null
+  const ownerTeamId = ownerField === '' || personId !== null ? null : ownerField
   const schedulingType: EventType['schedulingType'] =
     ownerTeamId === null ? 'personal' : text('schedulingType') === 'collective' ? 'collective' : 'round_robin'
   const draft: EventType = {
     id: '',
-    ownerUserId: ownerTeamId === null ? ownerUserId : null,
+    ownerUserId: ownerTeamId === null ? personId || ownerUserId : null,
     ownerTeamId,
     schedulingType,
     slug: text('slug') || slugify(title),
@@ -3948,6 +3996,14 @@ async function validateEventType(
     }
   }
 
+  // Same for a person: only an instance admin puts an event type under
+  // someone else, and only under someone who exists.
+  const forOther = draft.ownerUserId !== null && draft.ownerUserId !== user.id
+  if (forOther) {
+    if (user.role !== 'admin') errors['owner'] = 'Only an admin can create event types for someone else'
+    else if (!(await repos.users.byId(draft.ownerUserId!))) errors['owner'] = 'That person no longer has an account'
+  }
+
   if (!/^[a-z0-9-]{1,60}$/.test(draft.slug)) {
     errors['slug'] = 'Lowercase letters, numbers and hyphens only'
   } else if (RESERVED_SLUGS.has(draft.slug)) {
@@ -3961,12 +4017,14 @@ async function validateEventType(
     const siblings =
       draft.ownerTeamId !== null && !errors['owner']
         ? await repos.eventTypes.listForTeam(draft.ownerTeamId)
-        : await repos.eventTypes.listForUser(user.id)
+        : await repos.eventTypes.listForUser(draft.ownerUserId ?? user.id)
     if (siblings.some((et) => et.slug === draft.slug && et.id !== currentId)) {
       errors['slug'] =
         draft.ownerTeamId !== null
           ? 'That team already has an event type with this slug'
-          : 'You already have an event type with this slug'
+          : forOther
+            ? 'They already have an event type with this slug'
+            : 'You already have an event type with this slug'
     }
   }
 
@@ -4004,8 +4062,8 @@ async function validateEventType(
   if (draft.scheduleId !== null) {
     if (draft.ownerTeamId !== null) {
       errors['scheduleId'] = 'A team event type cannot use a specific schedule'
-    } else if (!(await repos.availability.byId(user.id, draft.scheduleId))) {
-      errors['scheduleId'] = 'Pick one of your own schedules'
+    } else if (!(await repos.availability.byId(draft.ownerUserId ?? user.id, draft.scheduleId))) {
+      errors['scheduleId'] = forOther ? 'Pick one of their schedules' : 'Pick one of your own schedules'
     }
   }
 

@@ -344,6 +344,8 @@ export interface EventTypeListItem {
   ownerSlug: string
   /** Set for team-owned rows, so the card can say whose event this is. */
   teamName?: string
+  /** Set on someone else's personal row, shown to an instance admin who manages it. */
+  personName?: string
   /**
    * False for a team-owned row the signed-in user may only look at — they
    * host it but are not one of the team's admins (core/domain/teams.ts).
@@ -525,6 +527,7 @@ function eventTypeCard(d: DashboardHomeData, item: EventTypeListItem): string {
     <h2 style="display:flex;align-items:center;gap:.5rem">${logo}${escapeHtml(et.title)}</h2>
     <div class="pu-et-actions">
       ${item.teamName ? `<span class="pu-badge">${escapeHtml(item.teamName)}</span>` : ''}
+      ${item.personName ? `<span class="pu-badge pu-badge-neutral">${escapeHtml(item.personName)}</span>` : ''}
       ${et.active ? '' : '<span class="pu-badge" style="background:var(--pu-paper-dim);color:var(--pu-ink-500)">Hidden</span>'}
       ${edit}
       <a class="pu-btn pu-btn-ghost" href="${escapeHtml(url)}">Preview</a>
@@ -621,6 +624,14 @@ export interface EventTypeFormData extends DashboardChrome {
    * the block has a team to list). See `hostsFields`.
    */
   hostChoices?: HostChoice[]
+  /**
+   * Everyone on the instance, for an instance admin: the owner select then
+   * offers each person beside the teams, so an admin can set up and edit
+   * event types on someone else's behalf. Absent for everyone else.
+   */
+  owners?: User[]
+  /** The person a personal event type belongs to, when that is not the signed-in user. */
+  forUser?: User
   /** Set after a create redirected here: the page says what to do next. */
   notice?: string
   errors?: Record<string, string>
@@ -831,7 +842,8 @@ export function eventTypeForm(d: EventTypeFormData): string {
   // owner is the team when there is one. The user's own slug there would
   // print a link that 404s for every team-owned event type.
   const ownerTeam = teams.find((t) => t.id === et?.ownerTeamId)
-  const prefix = ownerTeam ? ownerTeam.slug : d.user.slug
+  const owner = d.forUser ?? d.user
+  const prefix = ownerTeam ? ownerTeam.slug : owner.slug
   // A slug that failed validation is not previewed as an address: the error
   // right above already quotes it, and "/support/Bad Slug!" reads as a claim.
   const slugPreview = et?.slug && /^[a-z0-9-]+$/.test(et.slug) ? escapeHtml(et.slug) : '&lt;slug&gt;'
@@ -870,6 +882,7 @@ export function eventTypeForm(d: EventTypeFormData): string {
     (d.notice ? notice(d.notice) : '') +
     `<section class="pu-card" aria-label="${editing ? 'Edit event type' : 'New event type'}">
   <h1>${editing ? 'Edit event type' : 'New event type'}</h1>
+  ${d.forUser && !et?.ownerTeamId ? `<p class="pu-muted">For ${escapeHtml(d.forUser.name || d.forUser.slug)}, as an admin.</p>` : ''}
   ${editing ? logoPanel({ csrf: d.csrf, action: `/dashboard/event-types/${encodeURIComponent(et!.id)}/logo`, key: et!.logoKey ?? null, shape: et!.logoShape ?? null, name: et!.title, errorKey: 'logo', errors, hint: "Heads this event type's booking page and social card instead of your photo or the company logo. Square works best." }) : ''}
   <form method="post" action="${escapeHtml(action)}" class="pu-et-form">
     ${csrfField(d.csrf)}
@@ -1007,8 +1020,8 @@ ${
         ? ''
         : `<label for="mainEvent" style="display:flex;align-items:center;gap:.5rem;margin-top:.5rem">
       <input id="mainEvent" name="mainEvent" type="checkbox" value="1" style="width:auto"
-             ${et && et.id !== '' && d.user.mainEventTypeId === et.id ? 'checked' : ''}>
-      <span>Make this my main link: <code>/${escapeHtml(d.user.slug)}</code> opens it</span>
+             ${et && et.id !== '' && owner.mainEventTypeId === et.id ? 'checked' : ''}>
+      <span>Make this ${d.forUser ? 'their' : 'my'} main link: <code>/${escapeHtml(owner.slug)}</code> opens it</span>
     </label>`
     }
 
@@ -1047,8 +1060,23 @@ ${
 function ownershipFields(d: EventTypeFormData, teams: Team[], errors: Record<string, string>): string {
   // No teams, no selects — but a crafted POST naming a team the user is not
   // in still needs its refusal VISIBLE, or the 400 renders with no explanation.
-  if (teams.length === 0) return fieldError('owner', errors)
+  const people = d.owners ?? []
+  if (teams.length === 0 && people.length < 2) return fieldError('owner', errors)
   const et = d.eventType
+  // An admin picks a person by `user:<id>`; everyone else has the one
+  // personal choice, posted empty and read as themselves.
+  const selectedPerson = et?.ownerTeamId ? null : (et?.ownerUserId ?? d.forUser?.id ?? d.user.id)
+  const personOptions =
+    people.length < 2
+      ? `<option value=""${et?.ownerTeamId ? '' : ' selected'}>Me (personal)</option>`
+      : people
+          .map(
+            (p) =>
+              `<option value="user:${escapeHtml(p.id)}"${selectedPerson === p.id ? ' selected' : ''}>${
+                p.id === d.user.id ? 'Me' : escapeHtml(p.name || p.slug)
+              } (personal)</option>`,
+          )
+          .join('\n      ')
   const teamOptions = teams
     .map(
       (t) =>
@@ -1059,7 +1087,7 @@ function ownershipFields(d: EventTypeFormData, teams: Team[], errors: Record<str
       <div>
         <label for="owner">Owner</label>
         <select id="owner" name="owner"${describedBy('owner', errors)}${autofocusAttr('owner', errors)}>
-      <option value=""${et?.ownerTeamId ? '' : ' selected'}>Me (personal)</option>
+      ${personOptions}
       ${teamOptions}
     </select>
         ${fieldError('owner', errors)}
