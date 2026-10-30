@@ -17,7 +17,23 @@ const et = {
 describe('readPrefill', () => {
   it('keeps the names the form has and drops the rest', () => {
     const query: Record<string, string> = { name: 'Ana', phone: '7867080880', agenda: 'Kitchen', utm_source: 'x', 'project-type': 'New home' }
-    expect(readPrefill(et, (n) => query[n])).toEqual({ name: 'Ana', phone: '7867080880', agenda: 'Kitchen', 'project-type': 'New home' })
+    expect(readPrefill(et, query)).toEqual({ name: 'Ana', phone: '7867080880', agenda: 'Kitchen', 'project-type': 'New home' })
+  })
+
+  it('finds a question by its label, and a phone question by phone/tel/mobile', () => {
+    const byId = {
+      questions: [
+        { id: 'q1', label: 'Mobile number', type: 'phone', required: true },
+        { id: 'q2', label: 'Project type', type: 'text', required: false },
+        { id: 'q3', label: 'Company', type: 'text', required: false },
+      ],
+    } as unknown as EventType
+    expect(readPrefill(byId, { phone: '7867080880', project_type: 'Renovation', Company: 'MIK', other: 'x' })).toEqual({
+      q1: '7867080880',
+      q2: 'Renovation',
+      q3: 'MIK',
+    })
+    expect(readPrefill(byId, { tel: '+1786', q1: '+57300' })).toEqual({ q1: '+57300' })
   })
 })
 

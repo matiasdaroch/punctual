@@ -5,7 +5,10 @@
  * know, and the confirm form opens with it in place, still editable. Only
  * names the form actually has are kept: the guest's name (or first and last
  * name, joined), email, invited guests, and the answer to any of the event
- * type's questions by its id. They ride along through the day and time links
+ * type's questions. A question is found by its id, or failing that by its
+ * label (`?company=` for "Company", `?project_type=` for "Project type"),
+ * and a phone question also answers to `?phone=`, `?tel=` or `?mobile=`; its
+ * answer then reaches the host like one the guest typed. They ride along through the day and time links
  * the way `duration` and `location` do (http/pages/booking.ts `choiceQuery`).
  */
 
@@ -13,20 +16,34 @@ import { effectiveQuestions } from './booking-service.js'
 import { phoneFromLink } from './phone.js'
 import type { EventType } from './types.js'
 
-/** The fixed names a link may fill; anything else must be a question id. */
+/** The fixed names a link may fill; anything else must name a question. */
 const FIXED = ['name', 'email', 'first_name', 'last_name', 'firstname', 'lastname', 'guests'] as const
+const PHONE_NAMES = ['phone', 'phonenumber', 'tel', 'telephone', 'mobile', 'cell']
 const MAX_VALUE = 500
+
+/** A name compared loosely: case, spaces, dashes and underscores ignored. */
+function loose(name: string): string {
+  return name.toLowerCase().replace(/[^a-z0-9]/g, '')
+}
 
 /**
  * The prefill parameters in a request, keeping only names this event type's
- * form has, each cut to a sane length. `get` reads one query parameter.
+ * form has, each cut to a sane length. Answers come back under their
+ * question's id whatever name the link used, so the confirm form and the
+ * links onward read them the one way.
  */
-export function readPrefill(et: EventType, get: (name: string) => string | undefined): Record<string, string> {
-  const names = [...FIXED, ...effectiveQuestions(et).map((q) => q.id)]
+export function readPrefill(et: EventType, query: Record<string, string>): Record<string, string> {
   const out: Record<string, string> = {}
-  for (const name of names) {
-    const value = get(name)
+  const keep = (name: string, value: string | undefined): void => {
     if (value !== undefined && value.trim() !== '') out[name] = value.slice(0, MAX_VALUE)
+  }
+  for (const name of FIXED) keep(name, query[name])
+  const byLoose = new Map<string, string>()
+  for (const [k, v] of Object.entries(query)) if (!byLoose.has(loose(k))) byLoose.set(loose(k), v)
+  for (const q of effectiveQuestions(et)) {
+    const names = [q.id, q.label, ...(q.type === 'phone' ? PHONE_NAMES : [])]
+    const value = query[q.id] ?? names.map((n) => byLoose.get(loose(n))).find((v) => v !== undefined && v.trim() !== '')
+    keep(q.id, value)
   }
   return out
 }

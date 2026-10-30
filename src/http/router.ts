@@ -344,7 +344,7 @@ export function buildRouter(ports: EnginePorts, slots: SlotService): Hono<{ Bind
     // The guest's length (?duration=) shapes which times exist, so it is
     // applied before anything reads the event type; ?location= only
     // preselects the confirm form (core/domain/booking-options.ts).
-    const choice = readChoice(ctx.eventType, c.req.query('duration'), c.req.query('location'), (name) => c.req.query(name))
+    const choice = readChoice(ctx.eventType, c.req.query('duration'), c.req.query('location'), c.req.query())
     const eventType = choice.eventType
 
     const guestTimezone = resolveGuestTimezone(c.req.query('tz'), c.req.raw, host.tz)
@@ -498,7 +498,7 @@ export function buildRouter(ports: EnginePorts, slots: SlotService): Hono<{ Bind
     const ctx = await repos.eventTypes.bookingPageContext(userSlug, eventSlug)
     if (!ctx) return notFound(c, ports)
     const { host, team, companyLogo } = ctx
-    const choice = readChoice(ctx.eventType, c.req.query('duration'), c.req.query('location'), (name) => c.req.query(name))
+    const choice = readChoice(ctx.eventType, c.req.query('duration'), c.req.query('location'), c.req.query())
     const eventType = choice.eventType
 
     const start = Number(c.req.query('start'))
@@ -762,7 +762,7 @@ function readChoice(
   base: EventType,
   rawDuration: string | null | undefined,
   rawLocation: string | null | undefined,
-  query?: (name: string) => string | undefined,
+  query?: Record<string, string>,
 ): {
   eventType: EventType
   pageFields: { duration?: number; location?: number | null; prefill?: Record<string, string> }
