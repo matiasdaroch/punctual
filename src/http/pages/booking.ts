@@ -16,6 +16,7 @@
  */
 
 import type { ResolvedHost } from '../../core/domain/hosts.js'
+import { BRAND_FAVICON, BRAND_PRELOAD_FONTS, BRAND_THEME_COLOR, IS_AGD } from '../../brand.js'
 import { fitKeyFor, type LogoShape } from '../../core/domain/media.js'
 import type { CompanyLogo,
   Team, EventType, EventTypeQuestion, LocationType, Slot, User } from '../../core/domain/types.js'
@@ -92,9 +93,9 @@ export function shellHead(chrome: PageChrome): string {
 <title>${escapeHtml(chrome.title)}</title>
 ${chrome.description ? `<meta name="description" content="${escapeHtml(chrome.description)}">` : ''}
 <meta name="color-scheme" content="light dark">
-<meta name="theme-color" content="${chrome.themeColor ?? '#038C7F'}">
-<link rel="icon" href="/brand/mik/favicon.png" type="image/png">
-<link rel="apple-touch-icon" href="/brand/mik/favicon.png">
+<meta name="theme-color" content="${chrome.themeColor ?? BRAND_THEME_COLOR}">
+<link rel="icon" href="${BRAND_FAVICON}" type="image/png">
+<link rel="apple-touch-icon" href="${BRAND_FAVICON}">
 ${
   chrome.canonical
     ? `<link rel="canonical" href="${escapeHtml(chrome.canonical)}">`
@@ -120,8 +121,7 @@ ${chrome.description ? `<meta name="twitter:description" content="${escapeHtml(c
      the first paint is final, so a face that isn't preloaded is a face the
      visitor likely never sees on a cold cache. Inter carries all body text —
      leaving it out is what made whole pages repaint mid-view. -->
-<link rel="preload" href="/fonts/mulish-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
-<link rel="preload" href="/fonts/catamaran-latin-wght-normal.woff2" as="font" type="font/woff2" crossorigin>
+${BRAND_PRELOAD_FONTS.map((href) => `<link rel="preload" href="${href}" as="font" type="font/woff2" crossorigin>`).join('\n')}
 <style>${pageCss()}</style>
 </head>
 <body>
@@ -420,7 +420,9 @@ export function eventHeader(d: BookingPageData): string {
     locations.length > 1
       ? [...new Set(locations.map((o) => LOCATION_KIND[o.type]))].join(' · ')
       : locationLabel(d.eventType)
+  // AGD: its logo leads the page, the way its design system's top bar leads every page.
   return `<header class="pu-event-header">
+  ${IS_AGD ? `<div class="pu-agd-head">${brandLogoHtml('/', d.brandName || 'AGD Developers')}</div>` : ''}
   ${pageHead(d)}
   <h1>${escapeHtml(d.eventType.title)}</h1>
   ${d.eventType.description ? `<p class="pu-muted">${escapeHtml(d.eventType.description)}</p>` : ''}
@@ -893,7 +895,7 @@ export function bookedConfirmation(opts: {
     minute: '2-digit',
   })
   return `<section class="pu-card pu-confirm" aria-label="Booking confirmed">
-  <div class="pu-confirm-logo">${brandLogoHtml('/', opts.brandName ?? 'MIK Architecture')}</div>
+  <div class="pu-confirm-logo">${brandLogoHtml('/', opts.brandName ?? (IS_AGD ? 'AGD Developers' : 'MIK Architecture'))}</div>
   <p><span class="pu-badge">Confirmed</span></p>
   <h1>You're booked</h1>
   <p class="pu-muted"><strong style="color:var(--pu-ink-950)">${escapeHtml(opts.eventTitle)}</strong> with ${escapeHtml(opts.hostName)}</p>
@@ -1017,9 +1019,18 @@ export function shiftMonth(month: string, delta: number): string {
  * The brand lockup (assets/brand/mik), in place of the text wordmark: the
  * light-ground version, swapped for the white one on a dark theme by
  * `.pu-logo-light` / `.pu-logo-dark` in styles.ts.
+ *
+ * AGD uses its one-line logo (assets/brand/agd), the version its design
+ * system gives web headers: black on a light ground, white on a dark one.
  */
 export function brandLogoHtml(href: string, brandName: string, extraStyle = ''): string {
   const alt = escapeHtml(brandName)
+  if (IS_AGD) {
+    return `<a class="pu-mark pu-mark-logo pu-agd-logo" href="${escapeHtml(href)}"${extraStyle ? ` style="${extraStyle}"` : ''}>` +
+      `<img class="pu-logo-light" src="/brand/agd/logo-one-line-black.svg" alt="${alt}" width="200" height="17">` +
+      `<img class="pu-logo-dark" src="/brand/agd/logo-one-line-white.svg" alt="" aria-hidden="true" width="200" height="17">` +
+      `</a>`
+  }
   return `<a class="pu-mark pu-mark-logo" href="${escapeHtml(href)}"${extraStyle ? ` style="${extraStyle}"` : ''}>` +
     `<img class="pu-logo-light" src="/brand/mik/logo-light.svg" alt="${alt}" width="106" height="56">` +
     `<img class="pu-logo-dark" src="/brand/mik/logo-white.svg" alt="" aria-hidden="true" width="106" height="56">` +

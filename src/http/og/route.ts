@@ -15,6 +15,7 @@ import { Hono, type Context } from 'hono'
 import type { EnginePorts, RequestScope } from '../../ports.js'
 import { formatInZone, offsetLabel } from '../../core/time/zone.js'
 import { renderOgCard } from './render.js'
+import { BRAND_DEFAULT_OG } from '../../brand.js'
 import type { OgAvatar } from './card.js'
 import { resolveHosts } from '../../core/domain/hosts.js'
 import { joinNames } from '../pages/booking.js'
@@ -25,7 +26,7 @@ type Env = Record<string, unknown>
 
 /** Marketing content, not booking data — an hour of staleness is fine (mirrors ADR-0006 §1's freeBusy TTL philosophy). */
 const CACHE_TTL_SECONDS = 60 * 60
-const DEFAULT_CARD_PATH = '/og/default.png'
+const DEFAULT_CARD_PATH = BRAND_DEFAULT_OG
 const PNG_SUFFIX = '.png'
 
 /**

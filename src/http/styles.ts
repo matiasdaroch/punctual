@@ -29,6 +29,8 @@
  * copy in. Weights match what BASE_CSS/LANDING_CSS actually set — no spare
  * weights riding along unused.
  */
+import { IS_AGD } from '../brand.js'
+
 export const FONT_FACES = `
 @font-face{font-family:"Catamaran";font-style:normal;font-weight:100 900;font-display:optional;
   src:url(/fonts/catamaran-latin-wght-normal.woff2) format("woff2");
@@ -887,8 +889,86 @@ form:has(#owner option[value=""]:checked) .pu-sched-wrap{display:none}
 .pu-day-heading:first-of-type{margin-top:.75rem}
 `
 
+/**
+ * AGD Developers' design system (claude.ai "AGD Developers" design system:
+ * Space Grotesk alone, a black frame around white pages, hairline greys,
+ * square corners, no shadows, and mint/lavender/rose as fills under black
+ * text, never as text). Laid over TOKENS rather than replacing it, so every
+ * semantic token keeps its MIK-era meaning and only the primitives move.
+ * The system is light-only; the dark reading below is its black frame
+ * carried across the page, with mint taking the accent's place.
+ */
+const AGD_FONT_FACES = `
+@font-face{font-family:"Space Grotesk";font-style:normal;font-weight:300 700;font-display:optional;
+  src:url(/fonts/spacegrotesk-latin-wght-normal.woff2) format("woff2");
+  unicode-range:U+0000-00FF,U+0131,U+0152-0153,U+02BB-02BC,U+02C6,U+02DA,U+02DC,U+0304,U+0308,U+0329,U+2000-206F,U+20AC,U+2122,U+2191,U+2193,U+2212,U+2215,U+FEFF,U+FFFD}
+`
+
+const AGD_TOKENS = `
+:root{
+  --pu-ink-950:#0c0c0c; --pu-ink-900:#1a1a1a; --pu-ink-700:#414141; --pu-ink-500:#414141;
+  --pu-paper:#FFFFFF; --pu-paper-dim:#F4F4F4; --pu-line:#C4C4C4;
+  --pu-green-700:#0c0c0c; --pu-green-800:#0c0c0c; --pu-signal:#AEEEEE; --pu-green-tint:#AEEEEE;
+  --pu-green-fill:#0c0c0c; --pu-green-fill-hover:#1a1a1a;
+  --pu-danger:#c14454; --pu-danger-800:#a63a48; --pu-danger-text:#c14454; --pu-danger-tint:#F7E6EA;
+  --pu-font-display:"Space Grotesk","Helvetica Neue",Arial,system-ui,sans-serif;
+  --pu-font-ui:"Space Grotesk","Helvetica Neue",Arial,system-ui,sans-serif;
+  --pu-font-mono:"Space Grotesk",ui-monospace,SFMono-Regular,Menlo,monospace;
+  --pu-font-numeric:"Space Grotesk","Helvetica Neue",Arial,system-ui,sans-serif;
+  --pu-radius:0; --pu-radius-lg:0;
+  --pu-ring:0 0 0 3px #AEEEEE;
+  --pu-code-bg:#0c0c0c; --pu-code-fg:#F4F4F4; --pu-code-line:#2a2a2a;
+  --pu-canvas-pattern:none;
+  --pu-text-muted:#7c7c7c; --pu-text-disabled:rgba(65,65,65,.45);
+  --pu-surface-overlay:rgba(12,12,12,.45);
+  --pu-agd-cal:#E6E6FA;
+  --pu-slot-hover-bg:var(--pu-agd-cal); --pu-slot-selected-bg:var(--pu-agd-cal);
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme=light]){
+    --pu-paper:#0c0c0c; --pu-paper-dim:#1a1a1a; --pu-line:#2a2a2a;
+    --pu-ink-950:#FFFFFF; --pu-ink-500:#C4C4C4; --pu-green-700:#AEEEEE; --pu-green-800:#D6F7F7;
+    --pu-green-tint:rgba(174,238,238,.18); --pu-danger-text:#E6B5BF; --pu-danger-tint:#2a1418;
+    --pu-green-fill:#FFFFFF; --pu-green-fill-hover:#AEEEEE; --pu-text-on-accent:#0c0c0c;
+    --pu-surface-raised:#111111; --pu-canvas-pattern:none;
+    --pu-text-muted:rgba(196,196,196,.72); --pu-text-disabled:rgba(196,196,196,.45);
+    --pu-field-border:#414141; --pu-url-bg:#000000;
+    --pu-agd-cal:rgba(230,230,250,.16);
+  }
+}
+:root[data-theme=dark]{
+  --pu-paper:#0c0c0c; --pu-paper-dim:#1a1a1a; --pu-line:#2a2a2a;
+  --pu-ink-950:#FFFFFF; --pu-ink-500:#C4C4C4; --pu-green-700:#AEEEEE; --pu-green-800:#D6F7F7;
+  --pu-green-tint:rgba(174,238,238,.18); --pu-danger-text:#E6B5BF; --pu-danger-tint:#2a1418;
+  --pu-green-fill:#FFFFFF; --pu-green-fill-hover:#AEEEEE; --pu-text-on-accent:#0c0c0c;
+  --pu-surface-raised:#111111; --pu-canvas-pattern:none;
+  --pu-text-muted:rgba(196,196,196,.72); --pu-text-disabled:rgba(196,196,196,.45);
+  --pu-field-border:#414141; --pu-url-bg:#000000;
+  --pu-agd-cal:rgba(230,230,250,.16);
+}
+`
+
+/**
+ * AGD's type: display weight 500 with negative tracking, labels uppercase
+ * and widely tracked (the system's main hierarchy signal), and the one-line
+ * logo at 200px, over the design system's 100px screen minimum.
+ */
+const AGD_CSS = `
+h1,h2,h3{font-weight:500;letter-spacing:-.025em}
+h1{letter-spacing:-.03em}
+.pu-host-name,.pu-home-featured-title,.pu-home-item-title{font-weight:500;letter-spacing:-.02em}
+.pu-booking-facts dt,.pu-members th,.pu-docs-content th{text-transform:uppercase;letter-spacing:.12em;font-size:.6875rem;font-weight:500}
+.pu-btn{text-transform:uppercase;letter-spacing:.1em;font-size:.8125rem;font-weight:500}
+.pu-agd-logo{padding:8px 0}
+.pu-agd-logo img{height:17px;width:200px}
+.pu-agd-head{margin:0 0 1.75rem}
+.pu-day[data-has-slots="1"]{background:var(--pu-agd-cal);color:var(--pu-text-primary)}
+`
+
 export function pageCss(): string {
-  return FONT_FACES + TOKENS + BASE_CSS
+  return IS_AGD
+    ? AGD_FONT_FACES + TOKENS + AGD_TOKENS + BASE_CSS + AGD_CSS
+    : FONT_FACES + TOKENS + BASE_CSS
 }
 
 /**

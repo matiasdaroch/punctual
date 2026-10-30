@@ -25,6 +25,8 @@ import resvgWasmModule from '../../../node_modules/@resvg/resvg-wasm/index_bg.wa
 import { buildOgCard, type OgAvatar } from './card.js'
 import { catamaran400Subset, catamaran600Subset, mulish500Subset, mulish700Subset } from './fonts.js'
 import { isRenderSafe } from './safety.js'
+import { spaceGrotesk400Subset, spaceGrotesk500Subset, spaceGrotesk700Subset } from './fonts-agd.js'
+import { IS_AGD } from '../../brand.js'
 
 export interface OgRenderInput {
   /** The subtitle's subject: "Alice", "Alice, Bob and Carol", or "the Support team". */
@@ -72,12 +74,18 @@ export async function renderOgCard(input: OgRenderInput): Promise<Uint8Array | n
     const svg = await satori(element as unknown as Parameters<typeof satori>[0], {
       width: WIDTH,
       height: HEIGHT,
-      fonts: [
-        { name: 'Catamaran', data: catamaran600Subset().buffer as ArrayBuffer, weight: 600, style: 'normal' },
-        { name: 'Catamaran', data: catamaran400Subset().buffer as ArrayBuffer, weight: 400, style: 'normal' },
-        { name: 'Mulish', data: mulish700Subset().buffer as ArrayBuffer, weight: 700, style: 'normal' },
-        { name: 'Mulish', data: mulish500Subset().buffer as ArrayBuffer, weight: 500, style: 'normal' },
-      ],
+      fonts: IS_AGD
+        ? [
+            { name: 'Space Grotesk', data: spaceGrotesk700Subset().buffer as ArrayBuffer, weight: 700, style: 'normal' },
+            { name: 'Space Grotesk', data: spaceGrotesk500Subset().buffer as ArrayBuffer, weight: 500, style: 'normal' },
+            { name: 'Space Grotesk', data: spaceGrotesk400Subset().buffer as ArrayBuffer, weight: 400, style: 'normal' },
+          ]
+        : [
+            { name: 'Catamaran', data: catamaran600Subset().buffer as ArrayBuffer, weight: 600, style: 'normal' },
+            { name: 'Catamaran', data: catamaran400Subset().buffer as ArrayBuffer, weight: 400, style: 'normal' },
+            { name: 'Mulish', data: mulish700Subset().buffer as ArrayBuffer, weight: 700, style: 'normal' },
+            { name: 'Mulish', data: mulish500Subset().buffer as ArrayBuffer, weight: 500, style: 'normal' },
+          ],
     })
 
     // satori already vectorised every glyph into SVG paths (its default

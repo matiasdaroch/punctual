@@ -10,6 +10,8 @@
  * for OG rendering is not worth it) — see satori's "Use without JSX" mode.
  */
 
+import { IS_AGD } from '../../brand.js'
+import { AGD_LOGO_ASPECT, agdLogoDataUri } from './logo-agd.js'
 import { PATTERN_SCALE, PATTERN_TILE_HEIGHT, PATTERN_TILE_WIDTH, patternTileDataUri } from './pattern.js'
 
 // Loose enough to avoid depending on satori's own (React-typed) element
@@ -84,10 +86,10 @@ function avatarNode(a: OgAvatar, size: number, overlap = 0): OgElement {
         height: `${size}px`,
         marginLeft: `${-overlap}px`,
         backgroundColor: MIK_GREEN,
-        color: WHITE,
+        color: INITIAL_TEXT,
         fontFamily: DISPLAY,
         fontSize: `${Math.round(size * 0.42)}px`,
-        fontWeight: 600,
+        fontWeight: TITLE_WEIGHT,
       },
       children: a.initial,
     },
@@ -116,7 +118,7 @@ function avatarsNode(avatars: OgAvatar[], extraCount: number): OgElement {
           color: WHITE,
           fontFamily: DISPLAY,
           fontSize: '44px',
-          fontWeight: 600,
+          fontWeight: TITLE_WEIGHT,
         },
         children: `+${extraCount}`,
       },
@@ -129,16 +131,23 @@ function avatarsNode(avatars: OgAvatar[], extraCount: number): OgElement {
 // surface-brand (mik-green-dark) with white headlines, the closing phrase in
 // mik-green-light and mist for the small print.
 // MIK customization: mik-black under the cube pattern (pattern.ts).
-const GROUND = '#221F1F'
+// AGD (src/brand.ts): its design system's black frame with no pattern, the
+// closing phrase in accent-mint the way its one dark card titles in mint,
+// silver (grey-300) for the small print, faces on mint with black initials.
+const GROUND = IS_AGD ? '#0c0c0c' : '#221F1F'
 const WHITE = '#FFFFFF'
-const ACCENT = '#A9D9D0'
-const MIST = '#DDEEEA'
-const MIK_GREEN = '#038C7F'
-const MIK_BLACK = '#221F1F'
+const ACCENT = IS_AGD ? '#AEEEEE' : '#A9D9D0'
+const MIST = IS_AGD ? '#C4C4C4' : '#DDEEEA'
+const MIK_GREEN = IS_AGD ? '#AEEEEE' : '#038C7F'
+const MIK_BLACK = IS_AGD ? '#2a2a2a' : '#221F1F'
+const INITIAL_TEXT = IS_AGD ? '#0c0c0c' : WHITE
 
-const DISPLAY = 'Catamaran'
+const DISPLAY = IS_AGD ? 'Space Grotesk' : 'Catamaran'
 const BASELINE_NUDGE = 3
-const BODY = 'Mulish'
+const BODY = IS_AGD ? 'Space Grotesk' : 'Mulish'
+/** Display weight: AGD sets its titles at 500 with negative tracking. */
+const TITLE_WEIGHT = IS_AGD ? 500 : 600
+const TITLE_TRACKING = IS_AGD ? '-0.025em' : '0'
 
 /** Longer host/event combinations still fit at 1200x630 without overflowing satori's layout. */
 function titleFontSize(titleLine: string, subtitleLine: string): number {
@@ -162,9 +171,13 @@ export function buildOgCard(props: OgCardProps): OgElement {
         width: '1200px',
         height: '630px',
         backgroundColor: GROUND,
-        backgroundImage: `url(${patternTileDataUri()})`,
-        backgroundSize: `${PATTERN_TILE_WIDTH * PATTERN_SCALE}px ${PATTERN_TILE_HEIGHT * PATTERN_SCALE}px`,
-        backgroundRepeat: 'repeat',
+        ...(IS_AGD
+          ? {}
+          : {
+              backgroundImage: `url(${patternTileDataUri()})`,
+              backgroundSize: `${PATTERN_TILE_WIDTH * PATTERN_SCALE}px ${PATTERN_TILE_HEIGHT * PATTERN_SCALE}px`,
+              backgroundRepeat: 'repeat',
+            }),
         padding: '64px',
         fontFamily: DISPLAY,
       },
@@ -185,14 +198,14 @@ export function buildOgCard(props: OgCardProps): OgElement {
               {
                 type: 'div',
                 props: {
-                  style: { display: 'flex', color: WHITE, fontSize: `${fontSize}px`, lineHeight: 1.05, fontWeight: 600 },
+                  style: { display: 'flex', color: WHITE, fontSize: `${fontSize}px`, lineHeight: 1.05, fontWeight: TITLE_WEIGHT, letterSpacing: TITLE_TRACKING },
                   children: props.titleLine,
                 },
               },
               {
                 type: 'div',
                 props: {
-                  style: { display: 'flex', color: ACCENT, fontSize: `${fontSize}px`, lineHeight: 1.05, fontWeight: 600 },
+                  style: { display: 'flex', color: ACCENT, fontSize: `${fontSize}px`, lineHeight: 1.05, fontWeight: TITLE_WEIGHT, letterSpacing: TITLE_TRACKING },
                   children: props.subtitleLine,
                 },
               },
@@ -207,7 +220,7 @@ export function buildOgCard(props: OgCardProps): OgElement {
               color: MIST,
               fontFamily: BODY,
               fontSize: '30px',
-              fontWeight: 500,
+              fontWeight: IS_AGD ? 400 : 500,
             },
             children: props.timeLabel,
           },
@@ -224,6 +237,16 @@ export function buildOgCard(props: OgCardProps): OgElement {
  * baseline -- the same build as the emails' header (email-templates.ts).
  */
 function lockup(brandName: string): OgElement {
+  // AGD: its white horizontal logo, the version its design system gives
+  // headers on black; never retyped.
+  if (IS_AGD) {
+    const height = 56
+    const width = Math.round(height * AGD_LOGO_ASPECT)
+    return {
+      type: 'img',
+      props: { src: agdLogoDataUri(), width, height, style: { width: `${width}px`, height: `${height}px` } },
+    }
+  }
   const [first = '', ...rest] = brandName.trim().split(/\s+/)
   const children: OgElement[] = [
     { type: 'span', props: { style: { fontFamily: BODY, fontWeight: 700, fontSize: '28px', lineHeight: 1 }, children: first.toUpperCase() } },

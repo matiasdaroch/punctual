@@ -27,6 +27,7 @@ import type { Booking, EventType, User } from './domain/types.js'
 import { answeredQuestions } from './domain/booking-service.js'
 import { describeLocation } from './ics.js'
 import { formatInZone, offsetLabel } from './time/zone.js'
+import { IS_AGD } from '../brand.js'
 
 export interface EmailContent {
   subject: string
@@ -71,15 +72,23 @@ export interface BookingEmailContext {
 
 // Brand palette. Inline hex rather than tokens: email has no cascade and no
 // custom properties, so every colour has to travel with the element.
-const INK = '#221F1F'
-const MUTED = '#3F413E'
-const PAPER_DIM = '#EEEBE5'
-const LINE = '#E0DCD4'
-const MERIDIAN = '#46736E'
-const DANGER = '#D92D20'
+// AGD (src/brand.ts): its design system's black, graphite, mist and silver
+// (the 2026 brand manual greys), with links and buttons in black, not a hue.
+const INK = IS_AGD ? '#0c0c0c' : '#221F1F'
+const MUTED = IS_AGD ? '#414141' : '#3F413E'
+const PAPER_DIM = IS_AGD ? '#F4F4F4' : '#EEEBE5'
+const LINE = IS_AGD ? '#C4C4C4' : '#E0DCD4'
+const MERIDIAN = IS_AGD ? '#0c0c0c' : '#46736E'
+const DANGER = IS_AGD ? '#c14454' : '#D92D20'
 
-const FONT = "Mulish,'Trebuchet MS',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
-const DISPLAY = "Catamaran,'Trebuchet MS',-apple-system,BlinkMacSystemFont,Helvetica,Arial,sans-serif"
+// AGD's emails read in Poppins, its long-form reading face, with headings
+// left in Space Grotesk; both fall back to Arial and Helvetica.
+const FONT = IS_AGD
+  ? "Poppins,Arial,Helvetica,sans-serif"
+  : "Mulish,'Trebuchet MS',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif"
+const DISPLAY = IS_AGD
+  ? "'Space Grotesk','Helvetica Neue',-apple-system,BlinkMacSystemFont,Helvetica,Arial,sans-serif"
+  : "Catamaran,'Trebuchet MS',-apple-system,BlinkMacSystemFont,Helvetica,Arial,sans-serif"
 
 // ---------------------------------------------------------------------------
 // Escaping
@@ -785,6 +794,12 @@ export function dailyDigestEmail(input: DigestEmailInput): EmailContent {
  * heights meet (MIK Architecture design system, Logo).
  */
 function brandLockup(brandName: string): string {
+  // AGD: the design system's typed fallback for where its logo file cannot
+  // be placed, which an email is (clients block images by default): AGD in
+  // Space Grotesk Bold, black on white, one colour like the logo.
+  if (IS_AGD) {
+    return `<span style="font-family:${DISPLAY};font-size:22px;font-weight:700;letter-spacing:-0.02em;color:${INK};">AGD</span>`
+  }
   const [first = brandName, ...rest] = brandName.trim().split(/\s+/)
   return (
     `<span style="font-family:${FONT};font-size:15px;font-weight:700;letter-spacing:0.02em;color:${INK};">${escapeHtml(first.toUpperCase())}</span>` +
