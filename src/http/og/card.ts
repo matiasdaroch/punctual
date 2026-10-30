@@ -10,6 +10,8 @@
  * for OG rendering is not worth it) — see satori's "Use without JSX" mode.
  */
 
+import { PATTERN_SCALE, PATTERN_TILE_HEIGHT, PATTERN_TILE_WIDTH, patternTileDataUri } from './pattern.js'
+
 // Loose enough to avoid depending on satori's own (React-typed) element
 // shape here; render.ts hands this straight to `satori()`, which is where it
 // actually gets checked against satori's types.
@@ -126,7 +128,8 @@ function avatarsNode(avatars: OgAvatar[], extraCount: number): OgElement {
 // MIK customization: the MIK Architecture design system's brand page --
 // surface-brand (mik-green-dark) with white headlines, the closing phrase in
 // mik-green-light and mist for the small print.
-const GROUND = '#46736E'
+// MIK customization: mik-black under the cube pattern (pattern.ts).
+const GROUND = '#221F1F'
 const WHITE = '#FFFFFF'
 const ACCENT = '#A9D9D0'
 const MIST = '#DDEEEA'
@@ -159,6 +162,9 @@ export function buildOgCard(props: OgCardProps): OgElement {
         width: '1200px',
         height: '630px',
         backgroundColor: GROUND,
+        backgroundImage: `url(${patternTileDataUri()})`,
+        backgroundSize: `${PATTERN_TILE_WIDTH * PATTERN_SCALE}px ${PATTERN_TILE_HEIGHT * PATTERN_SCALE}px`,
+        backgroundRepeat: 'repeat',
         padding: '64px',
         fontFamily: DISPLAY,
       },

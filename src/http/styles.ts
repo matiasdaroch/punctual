@@ -112,6 +112,7 @@ export const TOKENS = `
      any other token, since nothing else in the palette is meant to be used
      at partial opacity over arbitrary content. */
   --pu-surface-canvas:var(--pu-paper);
+  --pu-canvas-pattern:none;
   --pu-surface-raised:var(--pu-paper);
   --pu-surface-sunken:var(--pu-paper-dim);
   --pu-surface-overlay:rgba(15,21,18,.45);
@@ -226,6 +227,7 @@ export const TOKENS = `
     --pu-text-muted:rgba(221,238,234,.72); --pu-text-disabled:rgba(221,238,234,.45);
     --pu-surface-overlay:rgba(0,0,0,.6);
     --pu-field-border:#4A4C49; --pu-url-bg:#1A1818;
+    --pu-canvas-pattern:url(/brand/mik/pattern-cube-black.svg);
   }
 }
 :root[data-theme=dark]{
@@ -237,6 +239,7 @@ export const TOKENS = `
   --pu-text-muted:rgba(221,238,234,.72); --pu-text-disabled:rgba(221,238,234,.45);
   --pu-surface-overlay:rgba(0,0,0,.6);
   --pu-field-border:#4A4C49; --pu-url-bg:#1A1818;
+  --pu-canvas-pattern:url(/brand/mik/pattern-cube-black.svg);
 }
 `
 
@@ -261,7 +264,7 @@ export const TOKENS = `
  */
 export const BASE_CSS = `
 *,*::before,*::after{box-sizing:border-box}
-body{margin:0;background:var(--pu-surface-canvas);color:var(--pu-text-primary);
+body{margin:0;background:var(--pu-canvas-pattern) 0 0/96.83px 161.23px repeat var(--pu-surface-canvas);color:var(--pu-text-primary);
   font-family:var(--pu-font-ui);line-height:1.5;-webkit-font-smoothing:antialiased}
 h1,h2,h3{font-family:var(--pu-font-display);font-weight:600;line-height:1.2;margin:0 0 .5rem}
 h1{font-size:1.5rem} h2{font-size:1.125rem} h3{font-size:1rem}
