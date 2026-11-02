@@ -921,7 +921,8 @@ const AGD_TOKENS = `
   --pu-canvas-pattern:none;
   --pu-text-muted:#7c7c7c; --pu-text-disabled:rgba(65,65,65,.45);
   --pu-surface-overlay:rgba(12,12,12,.45);
-  --pu-agd-cal:#E6E6FA;
+  --pu-agd-cal:#E6E6FA; --pu-agd-cal-line:#C4C4C4; --pu-agd-mark:#0c0c0c;
+  --pu-surface-canvas:#F4F4F4; --pu-surface-raised:#FFFFFF;
   --pu-slot-hover-bg:var(--pu-agd-cal); --pu-slot-selected-bg:var(--pu-agd-cal);
 }
 @media (prefers-color-scheme:dark){
@@ -933,7 +934,8 @@ const AGD_TOKENS = `
     --pu-surface-raised:#111111; --pu-canvas-pattern:none;
     --pu-text-muted:rgba(196,196,196,.72); --pu-text-disabled:rgba(196,196,196,.45);
     --pu-field-border:#414141; --pu-url-bg:#000000;
-    --pu-agd-cal:rgba(230,230,250,.16);
+    --pu-agd-cal:rgba(230,230,250,.16); --pu-agd-cal-line:#414141; --pu-agd-mark:#FFFFFF;
+    --pu-surface-canvas:#0c0c0c;
   }
 }
 :root[data-theme=dark]{
@@ -944,7 +946,8 @@ const AGD_TOKENS = `
   --pu-surface-raised:#111111; --pu-canvas-pattern:none;
   --pu-text-muted:rgba(196,196,196,.72); --pu-text-disabled:rgba(196,196,196,.45);
   --pu-field-border:#414141; --pu-url-bg:#000000;
-  --pu-agd-cal:rgba(230,230,250,.16);
+  --pu-agd-cal:rgba(230,230,250,.16); --pu-agd-cal-line:#414141; --pu-agd-mark:#FFFFFF;
+  --pu-surface-canvas:#0c0c0c;
 }
 `
 
@@ -962,7 +965,38 @@ h1{letter-spacing:-.03em}
 .pu-agd-logo{padding:8px 0}
 .pu-agd-logo img{height:17px;width:200px}
 .pu-agd-head{margin:0 0 1.75rem}
-.pu-day[data-has-slots="1"]{background:var(--pu-agd-cal);color:var(--pu-text-primary)}
+/* The calendar: open days lavender with a silver edge, today a dot rather
+   than a box, and the day being booked mint under a solid outline. The
+   selected rules come last and outrank every other day rule, so a picked
+   day never reads like the days around it. */
+.pu-day[data-has-slots="1"]{background:var(--pu-agd-cal);color:var(--pu-text-primary);box-shadow:inset 0 0 0 1px var(--pu-agd-cal-line)}
+.pu-day:hover[data-has-slots="1"]{background:var(--pu-agd-cal);color:var(--pu-text-primary);box-shadow:inset 0 0 0 1px var(--pu-agd-mark)}
+.pu-day[aria-current="date"]{box-shadow:none}
+.pu-day[aria-current="date"][data-has-slots="1"]{box-shadow:inset 0 0 0 1px var(--pu-agd-cal-line)}
+.pu-day[aria-current="date"]::after{content:"";position:absolute;bottom:4px;left:50%;width:4px;height:4px;margin-left:-2px;background:var(--pu-agd-mark)}
+.pu-day[aria-selected="true"],.pu-day[aria-selected="true"][data-has-slots],.pu-day[aria-selected="true"][aria-current],
+.pu-day[aria-selected="true"][data-has-slots]:hover{background:#AEEEEE;color:#0c0c0c;box-shadow:inset 0 0 0 2px var(--pu-agd-mark)}
+.pu-day[aria-selected="true"][aria-current]::after{background:#0c0c0c}
+/* The homepage: a headline under the logo, white cards on the mist page,
+   a mint "Featured" tag, and one row per person, name left and meetings
+   right. */
+.pu-home-eyebrow{margin:2rem 0 .5rem;font-size:.6875rem;letter-spacing:.14em;text-transform:uppercase;font-weight:500;color:var(--pu-ink-700)}
+.pu-home-title{font-size:clamp(2rem,3vw + 1rem,3rem);line-height:1.05;margin:0 0 1rem}
+.pu-home-hero{align-items:end;padding-bottom:2.5rem}
+.pu-home-featured{gap:.8rem;padding:1.5rem}
+.pu-home-featured-tag{align-self:flex-start;background:#AEEEEE;color:#0c0c0c;font-size:.6875rem;letter-spacing:.12em;text-transform:uppercase;font-weight:500;padding:.25rem .5rem}
+.pu-home-featured-who img,.pu-home-featured-who>div{width:44px!important;height:44px!important}
+.pu-home-featured-title{font-size:1.75rem;letter-spacing:-.025em}
+.pu-home-featured:hover,.pu-home-item:hover,.pu-home-featured:focus-visible,.pu-home-item:focus-visible{border-color:var(--pu-agd-mark)}
+.pu-home-tags{display:flex;flex-wrap:wrap;gap:.4rem}
+.pu-home-tag{font-size:.75rem;padding:.25rem .55rem;background:var(--pu-paper-dim);color:var(--pu-ink-700);font-weight:500}
+.pu-home-group{display:grid;grid-template-columns:13rem minmax(0,1fr);gap:1.5rem;align-items:start;padding:2rem 0;border-bottom:1px solid var(--pu-line)}
+.pu-home-group-head{margin:0}
+.pu-home-item{gap:.6rem;padding:1.15rem 1.2rem}
+.pu-home-item-title{font-size:1.1875rem}
+.pu-home-item-desc{display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+.pu-home-item-go{margin-top:auto;padding-top:.75rem;border-top:1px solid var(--pu-paper-dim);display:flex;justify-content:space-between;font-size:.75rem;letter-spacing:.12em;text-transform:uppercase;font-weight:500}
+@media (max-width:720px){.pu-home-group{grid-template-columns:1fr;gap:1rem}}
 `
 
 export function pageCss(): string {

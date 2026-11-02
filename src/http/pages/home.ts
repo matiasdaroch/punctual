@@ -10,7 +10,9 @@
 
 import type { CompanyLogo } from '../../core/domain/types.js'
 import type { HomeGroup, HomeItem, HomeOwner } from '../../core/domain/home.js'
-import { avatarHtml, brandLogoHtml, escapeHtml, logoHtml, shellHead } from './booking.js'
+import { avatarHtml, brandLogoHtml, escapeHtml, locationSummary, logoHtml, shellHead } from './booking.js'
+import { durationChoices } from '../../core/domain/booking-options.js'
+import { IS_AGD } from '../../brand.js'
 
 export interface InstanceHomeData {
   brandName: string
@@ -86,8 +88,30 @@ function faces(owner: HomeOwner, size: number): string {
   }</div>`
 }
 
+/**
+ * AGD's meeting facts as tags: every length on offer and the kinds of
+ * place, so a guest knows what they are picking before the page opens.
+ */
+function agdFacts(item: HomeItem): string {
+  const { eventType, owner } = item
+  const tags = [
+    `${durationChoices(eventType).join(' · ')} min`,
+    locationSummary(eventType),
+    owner.kind === 'team' && eventType.schedulingType === 'round_robin' ? 'With one of the team' : '',
+  ].filter(Boolean)
+  return `<span class="pu-home-tags">${tags.map((t) => `<span class="pu-home-tag">${escapeHtml(t)}</span>`).join('')}</span>`
+}
+
 function card(item: HomeItem): string {
   const { eventType, owner } = item
+  if (IS_AGD) {
+    return `<li><a class="pu-home-item" href="${escapeHtml(bookingHref(item))}">
+      <span class="pu-home-item-title">${escapeHtml(eventType.title)}</span>
+      ${agdFacts(item)}
+      ${eventType.description ? `<span class="pu-home-item-desc">${escapeHtml(eventType.description)}</span>` : ''}
+      <span class="pu-home-item-go">Pick a time <span aria-hidden="true">&rarr;</span></span>
+    </a></li>`
+  }
   return `<li><a class="pu-home-item" href="${escapeHtml(bookingHref(item))}">
       <span class="pu-home-item-title">${escapeHtml(eventType.title)}</span>
       <span class="pu-home-item-meta"><span class="pu-dot"></span> ${eventType.durationMinutes} min${owner.kind === 'team' && eventType.schedulingType === 'round_robin' ? ' · with one of the team' : ''}</span>
@@ -99,9 +123,10 @@ function featuredCard(item: HomeItem): string {
   const { eventType, owner } = item
   const line = ownerLine(owner)
   return `<a class="pu-home-featured" href="${escapeHtml(bookingHref(item))}">
+      ${IS_AGD ? '<span class="pu-home-featured-tag">Featured</span>' : ''}
       <span class="pu-home-featured-who">${faces(owner, 40)}<span><strong>${escapeHtml(owner.name)}</strong>${line ? `<br><span class="pu-muted">${line}</span>` : ''}</span></span>
       <span class="pu-home-featured-title">${escapeHtml(eventType.title)}</span>
-      <span class="pu-home-item-meta"><span class="pu-dot"></span> ${eventType.durationMinutes} min${owner.kind === 'team' && eventType.schedulingType === 'round_robin' ? ' · with one of the team' : ''}</span>
+      ${IS_AGD ? agdFacts(item) : `<span class="pu-home-item-meta"><span class="pu-dot"></span> ${eventType.durationMinutes} min${owner.kind === 'team' && eventType.schedulingType === 'round_robin' ? ' · with one of the team' : ''}</span>`}
       ${eventType.description ? `<span class="pu-home-item-desc">${escapeHtml(eventType.description)}</span>` : ''}
       <span class="pu-btn pu-home-featured-cta">Pick a time</span>
     </a>`
@@ -129,7 +154,14 @@ export function instanceHomePage(d: InstanceHomeData): string {
     ${logoHtml({ key: d.companyLogo.key, shape: d.companyLogo.shape, name: title, size: 56 })}
     ${d.companyLogo.shape === 'circle' ? `<div><p class="pu-host-name">${escapeHtml(title)}</p></div>` : ''}
   </div>
-  <h1 class="pu-sr">${escapeHtml(title)}</h1>`
+  ${
+    // AGD shows the title under its logo as the page's headline; elsewhere
+    // the logo already says the name.
+    IS_AGD
+      ? `<p class="pu-home-eyebrow">Book a meeting</p>
+  <h1 class="pu-home-title">${escapeHtml(title)}</h1>`
+      : `<h1 class="pu-sr">${escapeHtml(title)}</h1>`
+  }`
     : `${brandLogoHtml('/', d.brandName, 'margin-bottom:1.5rem')}
   <h1>${escapeHtml(title)}</h1>`
   const contacts = [

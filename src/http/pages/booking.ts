@@ -414,12 +414,8 @@ function pageHead(d: BookingPageData): string {
 
 export function eventHeader(d: BookingPageData): string {
   const durationLabel = `${d.eventType.durationMinutes} min`
-  const locations = locationChoices(d.eventType)
   // Several places on offer: name the kinds here, the guest picks one on the confirm form.
-  const location =
-    locations.length > 1
-      ? [...new Set(locations.map((o) => LOCATION_KIND[o.type]))].join(' · ')
-      : locationLabel(d.eventType)
+  const location = locationSummary(d.eventType)
   // AGD: its logo leads the page, the way its design system's top bar leads every page.
   return `<header class="pu-event-header">
   ${IS_AGD ? `<div class="pu-agd-head">${brandLogoHtml('/', d.brandName || 'AGD Developers')}</div>` : ''}
@@ -432,6 +428,12 @@ export function eventHeader(d: BookingPageData): string {
     <li>${timezonePicker(d)}</li>
   </ul>
 </header>`
+}
+
+/** The kinds of place an event type offers ("In person · Google Meet"), or its one location's label. */
+export function locationSummary(et: EventType): string {
+  const locations = locationChoices(et)
+  return locations.length > 1 ? [...new Set(locations.map((o) => LOCATION_KIND[o.type]))].join(' · ') : locationLabel(et)
 }
 
 const LOCATION_KIND: Record<LocationType, string> = {
