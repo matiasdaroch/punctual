@@ -1871,7 +1871,7 @@ export interface TeamView {
   canManage: boolean
   /** True on the instance admin's view of a team they are not on — the card says so, since "why do I see this" is a fair question. */
   viaInstanceAdmin?: boolean
-  /** The team's Slack / Telegram channels; filled for managers only. */
+  /** The team's Slack / Telegram / n8n channels; filled for managers only. */
   channels?: NotificationChannel[]
 }
 
@@ -1885,7 +1885,7 @@ export interface TeamsPageData extends DashboardChrome {
   addValues?: { teamId: string; email: string; weight: string }
   /** Echo of a failed rename / re-slug submit, scoped to one team's settings form. */
   editValues?: { teamId: string; name: string; slug: string; showName: boolean }
-  channelDraft?: { teamId: string; kind?: string; webhookUrl?: string; chatId?: string; events?: string[] }
+  channelDraft?: { teamId: string; kind?: string; webhookUrl?: string; chatId?: string; n8nUrl?: string; events?: string[] }
   errors?: Record<string, string>
   notice?: string
 }
@@ -2413,16 +2413,16 @@ export interface SettingsPageData extends DashboardChrome {
   companyUrlValue?: string
   /** Public origin, so "View your booking page" opens the address a guest would use. */
   baseUrl: string
-  /** The host's own Slack / Telegram channels (core/domain/chat-notify.ts). */
+  /** The host's own Slack / Telegram / n8n channels (core/domain/chat-notify.ts). */
   channels: NotificationChannel[]
-  channelDraft?: { kind?: string; webhookUrl?: string; chatId?: string; events?: string[] }
+  channelDraft?: { kind?: string; webhookUrl?: string; chatId?: string; n8nUrl?: string; events?: string[] }
   errors?: Record<string, string>
   notice?: string
 }
 
 
 /**
- * Slack / Telegram notification channels for one owner — a host's own on
+ * Slack / Telegram / n8n notification channels for one owner — a host's own on
  * Settings, a team's inside its settings. List with delete and "Send a
  * test", then the form to add one. The destination is a secret: shown
  * once as the masked label, never read back.
@@ -2435,7 +2435,7 @@ export function channelsPanel(o: {
   errorKey: string
   errors: Record<string, string>
   /** Field values to refill after a failed submit. */
-  draft?: { kind?: string; webhookUrl?: string; chatId?: string; events?: string[] }
+  draft?: { kind?: string; webhookUrl?: string; chatId?: string; n8nUrl?: string; events?: string[] }
   idPrefix: string
 }): string {
   const p = o.idPrefix
@@ -2459,18 +2459,19 @@ export function channelsPanel(o: {
   ).join('')
   return `${list}
   <details class="pu-channel-add"${o.errors[o.errorKey] ? ' open' : ''}>
-    <summary>Add a Slack or Telegram channel</summary>
+    <summary>Add a Slack, Telegram or n8n channel</summary>
     <form method="post" action="${escapeHtml(o.action)}" style="margin-top:.75rem">
       ${csrfField(o.csrf)}
       ${fieldError(o.errorKey, o.errors)}
       <fieldset style="border:0;padding:0;margin:0 0 .75rem">
         <legend class="pu-sr">Service</legend>
         <label style="display:inline-flex;align-items:center;gap:.3rem;margin-right:1rem;font-weight:400"><input type="radio" name="kind" value="slack"${kind === 'slack' ? ' checked' : ''}> Slack</label>
-        <label style="display:inline-flex;align-items:center;gap:.3rem;font-weight:400"><input type="radio" name="kind" value="telegram"${kind === 'telegram' ? ' checked' : ''}> Telegram</label>
+        <label style="display:inline-flex;align-items:center;gap:.3rem;margin-right:1rem;font-weight:400"><input type="radio" name="kind" value="telegram"${kind === 'telegram' ? ' checked' : ''}> Telegram</label>
+        <label style="display:inline-flex;align-items:center;gap:.3rem;font-weight:400"><input type="radio" name="kind" value="n8n"${kind === 'n8n' ? ' checked' : ''}> n8n</label>
       </fieldset>
       <label for="${p}-webhook">Slack incoming webhook URL</label>
       <input id="${p}-webhook" name="webhook_url" type="url" inputmode="url" maxlength="300" placeholder="https://hooks.slack.com/services/T…/B…/…" value="${escapeHtml(draft.webhookUrl ?? '')}" autocomplete="off">
-      <p class="pu-muted" style="font-size:.8125rem;margin:.25rem 0 .75rem">Slack: your workspace → Apps → Incoming Webhooks → Add to a channel, then paste the URL. Leave blank for Telegram.</p>
+      <p class="pu-muted" style="font-size:.8125rem;margin:.25rem 0 .75rem">Slack: your workspace → Apps → Incoming Webhooks → Add to a channel, then paste the URL. Leave blank for Telegram or n8n.</p>
       <div class="pu-grid" style="grid-template-columns:repeat(auto-fit,minmax(12rem,1fr));gap:0 1rem">
         <div>
           <label for="${p}-token">Telegram bot token</label>
@@ -2481,7 +2482,18 @@ export function channelsPanel(o: {
           <input id="${p}-chat" name="chat_id" maxlength="40" placeholder="-1001234567890 or @channel" value="${escapeHtml(draft.chatId ?? '')}" autocomplete="off">
         </div>
       </div>
-      <p class="pu-muted" style="font-size:.8125rem;margin:.25rem 0 .75rem">Telegram: make a bot with @BotFather, add it to the group or channel, and get the chat id from @userinfobot or the bot's getUpdates. Leave blank for Slack.</p>
+      <p class="pu-muted" style="font-size:.8125rem;margin:.25rem 0 .75rem">Telegram: make a bot with @BotFather, add it to the group or channel, and get the chat id from @userinfobot or the bot's getUpdates. Leave blank for Slack or n8n.</p>
+      <div class="pu-grid" style="grid-template-columns:repeat(auto-fit,minmax(12rem,1fr));gap:0 1rem">
+        <div>
+          <label for="${p}-n8n-url">n8n webhook URL</label>
+          <input id="${p}-n8n-url" name="n8n_url" type="url" inputmode="url" maxlength="500" placeholder="https://n8n.example.com/webhook/…" value="${escapeHtml(draft.n8nUrl ?? '')}" autocomplete="off">
+        </div>
+        <div>
+          <label for="${p}-n8n-secret">n8n secret <span class="pu-muted">(optional)</span></label>
+          <input id="${p}-n8n-secret" name="n8n_secret" type="password" maxlength="200" autocomplete="off">
+        </div>
+      </div>
+      <p class="pu-muted" style="font-size:.8125rem;margin:.25rem 0 .75rem">n8n: add a Webhook node (POST), activate the workflow and paste its Production URL. Each booking arrives as JSON: guest, times, answers, location, hosts. With a secret, it is sent in the <code>X-Webhook-Secret</code> header for the node's Header Auth to check.</p>
       <p style="font-weight:600;margin:0 0 .25rem">Tell me about</p>
       <div>${events}</div>
       <div style="margin-top:.75rem"><button class="pu-btn" type="submit">Add channel</button></div>

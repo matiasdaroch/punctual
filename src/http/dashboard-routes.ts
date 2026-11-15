@@ -2562,7 +2562,7 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
     return renderAdmin(c, { notice: mode === 'index' ? 'Homepage saved — / now shows this instance.' : 'Homepage saved — / shows the landing.' })
   })
 
-  // ---- Slack / Telegram notification channels (core/domain/chat-notify.ts) ----
+  // ---- Slack / Telegram / n8n notification channels (core/domain/chat-notify.ts) ----
 
   function readChannelForm(form: FormData) {
     const kind = String(form.get('kind') ?? 'slack')
@@ -2570,9 +2570,16 @@ export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): Ap
       kind,
       webhookUrl: String(form.get('webhook_url') ?? ''),
       chatId: String(form.get('chat_id') ?? ''),
+      n8nUrl: String(form.get('n8n_url') ?? ''),
       events: form.getAll('events').map(String),
     }
-    const parsed = parseDestination(kind, { webhookUrl: draft.webhookUrl, botToken: String(form.get('bot_token') ?? ''), chatId: draft.chatId })
+    const parsed = parseDestination(kind, {
+      webhookUrl: draft.webhookUrl,
+      botToken: String(form.get('bot_token') ?? ''),
+      chatId: draft.chatId,
+      n8nUrl: draft.n8nUrl,
+      n8nSecret: String(form.get('n8n_secret') ?? ''),
+    })
     const events = parseChannelEvents(draft.events)
     return { draft, parsed, events }
   }

@@ -141,17 +141,17 @@ const TG_TOKEN = '123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw0'
 
 /** Capture outbound posts: the engine's chat delivery and the test button go through global fetch. */
 function captureFetch(status = 200) {
-  const calls: Array<{ url: string; body: unknown }> = []
+  const calls: Array<{ url: string; body: unknown; headers: Record<string, string> }> = []
   const real = globalThis.fetch
   globalThis.fetch = (async (url: RequestInfo | URL, init?: RequestInit) => {
-    calls.push({ url: String(url), body: init?.body ? JSON.parse(String(init.body)) : null })
+    calls.push({ url: String(url), body: init?.body ? JSON.parse(String(init.body)) : null, headers: (init?.headers ?? {}) as Record<string, string> })
     return new Response(status === 200 ? 'ok' : 'no_service', { status })
   }) as typeof globalThis.fetch
   return { calls, restore: () => { globalThis.fetch = real } }
 }
 
 /**
- * A host's and a team's Slack / Telegram channels: added from the
+ * A host's and a team's Slack / Telegram / n8n channels: added from the
  * dashboard (secret stored encrypted, shown as a masked label), fanned out
  * on a booking event through the queue, delivered by the consumer, tested
  * with one button.
@@ -288,5 +288,41 @@ describe('notification channels', () => {
     const gone = await postForm(`/dashboard/notifications/${row!.id}/delete`, cookie, { csrf })
     expect(gone.status).toBe(302)
     expect(await db.prepare('SELECT COUNT(*) AS n FROM notification_channels WHERE id = ?').bind(row!.id).first<{ n: number }>()).toEqual({ n: 0 })
+  })
+
+  it('a host adds an n8n channel; the consumer posts the booking as JSON with the secret header', async () => {
+    const cookie = await seedSession(OTHER)
+    const csrf = await csrfFor(cookie)
+    const bad = await postForm('/dashboard/notifications', cookie, { csrf, kind: 'n8n', n8n_url: 'http://n8n.example.test/webhook/x', events: 'booking.created' })
+    expect(bad.status).toBe(400)
+    expect(await bad.text()).toContain('An n8n webhook URL is the Production URL')
+    const ok = await postForm('/dashboard/notifications', cookie, { csrf, kind: 'n8n', n8n_url: 'https://n8n.example.test/webhook/abc-123', n8n_secret: 'shh-42', events: 'booking.created' })
+    expect(ok.status).toBe(200)
+    const html = await ok.text()
+    expect(html).toContain('n8n · n8n.example.test (with secret)')
+    expect(html).not.toContain('abc-123')
+    expect(html).not.toContain('shh-42')
+    const row = await db.prepare('SELECT * FROM notification_channels WHERE owner_kind = ? AND owner_id = ?').bind('user', OTHER).first<Record<string, string>>()
+    expect(row!.kind).toBe('n8n')
+    expect(row!.config_enc).not.toContain('n8n.example.test')
+
+    const { calls, restore } = captureFetch()
+    try {
+      await handleOne({ kind: 'chat', channelId: row!.id!, event: 'booking.created', bookingId: BOOKING }, ports)
+      const test = await postForm(`/dashboard/notifications/${row!.id}/test`, cookie, { csrf })
+      expect(await test.text()).toContain('Test sent to n8n · n8n.example.test')
+    } finally {
+      restore()
+    }
+    expect(calls).toHaveLength(2)
+    expect(calls[0]!.url).toBe('https://n8n.example.test/webhook/abc-123')
+    expect(calls[0]!.headers['x-webhook-secret']).toBe('shh-42')
+    const body = calls[0]!.body as Record<string, any>
+    expect(body.event).toBe('booking.created')
+    expect(body.booking.id).toBe(BOOKING)
+    expect(body.guest).toMatchObject({ name: 'Ada Lovelace', email: 'ada@example.test' })
+    expect(body.eventType.title).toBe('Crew call')
+    expect(body.hosts.map((h: { name: string }) => h.name)).toEqual(['Chan Host', 'Ch Admin'])
+    expect((calls[1]!.body as Record<string, unknown>).test).toBe(true)
   })
 })

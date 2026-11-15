@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import type { Booking, EventType, User } from '../../src/core/domain/types.js'
-import { chatMessage, parseChannelEvents, parseDestination, slackPayload, telegramPayload } from '../../src/core/domain/chat-notify.js'
+import { chatMessage, n8nPayload, parseChannelEvents, parseDestination, slackPayload, telegramPayload } from '../../src/core/domain/chat-notify.js'
 import { postChatMessage } from '../../src/adapters/chat.js'
 
 const eventType = { id: 'et_1', title: 'Intro call', durationMinutes: 30 } as EventType
@@ -27,6 +27,20 @@ describe('destinations', () => {
     expect(parseDestination('telegram', { botToken: 'nope', chatId: '1' }).ok).toBe(false)
     expect(parseDestination('telegram', { botToken: '123456789:AAHdqTcvCH1vGWJxfSeofSAs0K5PALDsaw0', chatId: 'acme' }).ok).toBe(false)
     expect(parseDestination('discord', {}).ok).toBe(false)
+  })
+
+  it('accepts an n8n webhook on any public https host, with an optional secret', () => {
+    expect(parseDestination('n8n', { n8nUrl: ' https://n8n.mikarch.com/webhook/abc-123 ' })).toEqual({
+      ok: true,
+      config: { kind: 'n8n', url: 'https://n8n.mikarch.com/webhook/abc-123' },
+      label: 'n8n · n8n.mikarch.com',
+    })
+    const withSecret = parseDestination('n8n', { n8nUrl: 'https://x.app.n8n.cloud/webhook/1', n8nSecret: ' s3cret ' })
+    expect(withSecret).toEqual({ ok: true, config: { kind: 'n8n', url: 'https://x.app.n8n.cloud/webhook/1', secret: 's3cret' }, label: 'n8n · x.app.n8n.cloud (with secret)' })
+    for (const bad of ['http://n8n.example.com/webhook/1', 'https://localhost/webhook/1', 'https://10.0.0.5/webhook/1', 'https://[::1]/webhook', 'https://user:pw@n8n.example.com/w', 'https://intranet/w', 'nope', '']) {
+      expect(parseDestination('n8n', { n8nUrl: bad }).ok, bad).toBe(false)
+    }
+    expect(parseDestination('n8n', { n8nUrl: 'https://n8n.example.com/w', n8nSecret: 'a\nb' }).ok).toBe(false)
   })
 
   it('keeps only known events, once each', () => {
@@ -62,6 +76,27 @@ describe('the message', () => {
   })
 })
 
+describe('the n8n payload', () => {
+  it('carries the booking as fields, the answers by id and by label, and the readable summary', () => {
+    const et = { ...eventType, slug: 'intro', questions: [{ id: 'q1', label: 'Phone', type: 'phone', required: true }] } as unknown as EventType
+    const b = { ...booking, answers: { q1: '+1 7865550100' }, locationType: 'phone', locationValue: '+1 7865550100', guests: ['bo@example.com'], conferenceUrl: null } as Booking
+    const p = n8nPayload(chatMessage({ event: 'booking.created', booking: b, eventType: et, hosts, tz: 'America/New_York', link: 'https://punctual.test/dashboard/bookings/bk_1' }))
+    expect(p['event']).toBe('booking.created')
+    expect(p['booking']).toMatchObject({ id: 'bk_1', start: '2026-10-07T13:30:00.000Z', startLocal: '10/07/2026, 09:30', timezone: 'America/New_York', durationMinutes: 30, location: { type: 'phone', value: '+1 7865550100' } })
+    expect(p['guest']).toEqual({ name: 'Ada <Lovelace>', email: 'ada@example.com', timezone: 'UTC', guests: ['bo@example.com'] })
+    expect(p['answers']).toEqual({ q1: '+1 7865550100' })
+    expect(p['answersByLabel']).toEqual({ Phone: '+1 7865550100' })
+    expect(p['eventType']).toEqual({ id: 'et_1', slug: 'intro', title: 'Intro call', durationMinutes: 30 })
+    expect((p['hosts'] as unknown[]).length).toBe(2)
+    expect((p['summary'] as { headline: string }).headline).toBe('New booking: Intro call')
+    expect(p['link']).toBe('https://punctual.test/dashboard/bookings/bk_1')
+  })
+
+  it('marks a test message as one', () => {
+    expect(n8nPayload({ headline: 'Test', lines: ['hi'], link: 'x' })).toMatchObject({ event: 'test', test: true, summary: { text: 'Test\nhi' } })
+  })
+})
+
 describe('posting', () => {
   const m = chatMessage({ event: 'booking.created', booking, eventType, hosts, tz: 'UTC', link: 'https://punctual.test/x' })
 
@@ -76,6 +111,25 @@ describe('posting', () => {
     expect(calls[0]!.url).toBe('https://hooks.slack.com/services/T/B/x')
     expect(calls[1]!.url).toBe('https://api.telegram.org/bot1:abc/sendMessage')
     expect((calls[1]!.body as { chat_id: string }).chat_id).toBe('@c')
+  })
+
+  it('posts the n8n JSON to its URL, with the secret in a header when there is one', async () => {
+    const calls: Array<{ url: string; headers: Record<string, string>; body: Record<string, unknown> }> = []
+    const fetchImpl = (async (url: RequestInfo | URL, init?: RequestInit) => {
+      calls.push({ url: String(url), headers: init?.headers as Record<string, string>, body: JSON.parse(String(init?.body)) })
+      return new Response('{"message":"Workflow was started"}', { status: 200 })
+    }) as typeof globalThis.fetch
+    expect(await postChatMessage({ kind: 'n8n', url: 'https://n8n.example.com/webhook/1', secret: 'k' }, m, fetchImpl)).toEqual({ ok: true })
+    expect(await postChatMessage({ kind: 'n8n', url: 'https://n8n.example.com/webhook/1' }, m, fetchImpl)).toEqual({ ok: true })
+    expect(calls[0]!.url).toBe('https://n8n.example.com/webhook/1')
+    expect(calls[0]!.headers['x-webhook-secret']).toBe('k')
+    expect(calls[1]!.headers['x-webhook-secret']).toBeUndefined()
+    expect(calls[0]!.body['event']).toBe('booking.created')
+    const inactive = (async () => new Response('{"message":"The requested webhook is not registered."}', { status: 404 })) as typeof globalThis.fetch
+    expect(await postChatMessage({ kind: 'n8n', url: 'https://n8n.example.com/webhook/1', secret: 'k' }, m, inactive)).toEqual({
+      ok: false,
+      detail: 'n8n answered 404: {"message":"The requested webhook is not registered."}',
+    })
   })
 
   it('reports a refusal without echoing the secret, and a network failure', async () => {

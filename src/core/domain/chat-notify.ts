@@ -1,22 +1,31 @@
 /**
  * Booking notifications in the places a team actually looks: a Slack
- * channel, a Telegram chat. Email reaches the host; this reaches the room.
+ * channel, a Telegram chat, or an n8n workflow. Email reaches the host;
+ * this reaches the room.
  *
  * A channel belongs to a user (their own bookings) or to a team (every
  * booking of the team's event types), carries a list of events, and a
- * destination — a Slack incoming-webhook URL, or a Telegram bot token and
- * chat id — that is a secret and is stored encrypted. Delivery runs on the
- * queue beside webhooks, so a slow chat API never slows a booking.
+ * destination — a Slack incoming-webhook URL, a Telegram bot token and chat
+ * id, or an n8n webhook URL and optional shared secret — that is a secret
+ * and is stored encrypted. Delivery runs on the queue beside webhooks, so a
+ * slow chat API never slows a booking.
+ *
+ * Slack and Telegram get a sentence for people to read; n8n gets the
+ * booking as fields (`n8nPayload`), for a workflow to map without parsing.
  */
 
 import type { Booking, EventType, User, WebhookEvent } from './types.js'
 import { formatInZone } from '../time/zone.js'
 import { joinNames } from './calendar-text.js'
+import { answeredQuestions } from './booking-service.js'
 
-export type ChannelKind = 'slack' | 'telegram'
+export type ChannelKind = 'slack' | 'telegram' | 'n8n'
 export type ChannelOwnerKind = 'user' | 'team'
 
-export type ChannelConfig = { kind: 'slack'; webhookUrl: string } | { kind: 'telegram'; botToken: string; chatId: string }
+export type ChannelConfig =
+  | { kind: 'slack'; webhookUrl: string }
+  | { kind: 'telegram'; botToken: string; chatId: string }
+  | { kind: 'n8n'; url: string; secret?: string }
 
 export interface NotificationChannel {
   id: string
@@ -55,11 +64,16 @@ const TELEGRAM_TOKEN = /^\d{6,12}:[A-Za-z0-9_-]{30,}$/
 const TELEGRAM_CHAT = /^(-?\d{1,20}|@[A-Za-z0-9_]{5,32})$/
 
 /**
- * Only the two destinations this engine knows how to post to, each checked
- * for the shape its service issues — a webhook URL on any other host would
- * make the instance post booking details wherever a host typed.
+ * Only the destinations this engine knows how to post to, each checked for
+ * the shape its service issues — a Slack URL on any other host would make
+ * the instance post booking details wherever a host typed. n8n runs on the
+ * host's own domain, so its URL can be any https address, but only that:
+ * no plain http, no credentials in the URL, nothing local.
  */
-export function parseDestination(kind: string, fields: { webhookUrl?: string; botToken?: string; chatId?: string }): ParsedDestination {
+export function parseDestination(
+  kind: string,
+  fields: { webhookUrl?: string; botToken?: string; chatId?: string; n8nUrl?: string; n8nSecret?: string },
+): ParsedDestination {
   if (kind === 'slack') {
     const url = (fields.webhookUrl ?? '').trim()
     let parsed: URL | null = null
@@ -81,7 +95,24 @@ export function parseDestination(kind: string, fields: { webhookUrl?: string; bo
     if (!TELEGRAM_CHAT.test(chatId)) return { ok: false, message: 'A Telegram chat id is a number (negative for groups) or @channelname' }
     return { ok: true, config: { kind: 'telegram', botToken, chatId }, label: `Telegram · ${chatId} via bot ${botToken.split(':')[0]}` }
   }
-  return { ok: false, message: 'Choose Slack or Telegram' }
+  if (kind === 'n8n') {
+    const url = (fields.n8nUrl ?? '').trim()
+    const secret = (fields.n8nSecret ?? '').trim()
+    let parsed: URL | null = null
+    try {
+      parsed = new URL(url)
+    } catch {
+      parsed = null
+    }
+    const host = parsed?.hostname.toLowerCase() ?? ''
+    const local = host === 'localhost' || host.endsWith('.localhost') || host.endsWith('.local') || /^[\d.]+$/.test(host) || host.startsWith('[')
+    if (!parsed || parsed.protocol !== 'https:' || parsed.username || parsed.password || local || !host.includes('.') || url.length > 500) {
+      return { ok: false, message: 'An n8n webhook URL is the Production URL of a Webhook node, like https://n8n.example.com/webhook/…' }
+    }
+    if (secret.length > 200 || /[\r\n]/.test(secret)) return { ok: false, message: 'Keep the secret to one line of 200 characters or fewer' }
+    return { ok: true, config: { kind: 'n8n', url, ...(secret ? { secret } : {}) }, label: `n8n · ${host}${secret ? ' (with secret)' : ''}` }
+  }
+  return { ok: false, message: 'Choose Slack, Telegram or n8n' }
 }
 
 export function parseChannelEvents(values: string[]): WebhookEvent[] {
@@ -113,6 +144,8 @@ export interface ChatMessage {
   /** Plain-text lines under it. */
   lines: string[]
   link: string
+  /** The booking as fields, for n8n (`n8nPayload`); absent on a test message. */
+  data?: Record<string, unknown>
 }
 
 const HEADLINE: Record<WebhookEvent, string> = {
@@ -136,7 +169,49 @@ export function chatMessage(input: ChatMessageInput): ChatMessage {
     if (input.hostsAdded?.length) lines.push(`Added: ${input.hostsAdded.join(', ')}`)
     if (input.hostsRemoved?.length) lines.push(`Removed: ${input.hostsRemoved.join(', ')}`)
   }
-  return { headline: `${HEADLINE[input.event]}: ${eventType.title}`, lines: lines.filter(Boolean), link: input.link }
+  return { headline: `${HEADLINE[input.event]}: ${eventType.title}`, lines: lines.filter(Boolean), link: input.link, data: bookingData(input) }
+}
+
+/**
+ * The booking as an n8n workflow wants it: flat names, ISO times in UTC and
+ * in the reader's zone, and the answers both by question id and by the
+ * label the guest saw, so a workflow can map "Phone" without knowing ids.
+ */
+function bookingData(input: ChatMessageInput): Record<string, unknown> {
+  const { booking, eventType } = input
+  const answered = eventType.questions ? answeredQuestions(eventType, booking.answers) : []
+  const local = (t: number) => formatInZone(t, input.tz, { year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit', hour12: false })
+  return {
+    event: input.event,
+    booking: {
+      id: booking.id,
+      status: booking.status,
+      start: new Date(booking.startUtc).toISOString(),
+      end: new Date(booking.endUtc).toISOString(),
+      startLocal: local(booking.startUtc),
+      endLocal: local(booking.endUtc),
+      timezone: input.tz,
+      durationMinutes: Math.round((booking.endUtc - booking.startUtc) / 60_000),
+      location: booking.locationType ? { type: booking.locationType, value: booking.locationValue ?? null } : null,
+      conferenceUrl: booking.conferenceUrl ?? null,
+      rescheduleOf: booking.rescheduleOf ?? null,
+      cancelledAt: booking.cancelledAt ? new Date(booking.cancelledAt).toISOString() : null,
+      createdAt: booking.createdAt ? new Date(booking.createdAt).toISOString() : null,
+    },
+    guest: {
+      name: booking.guestName,
+      email: booking.guestEmail,
+      timezone: booking.guestTimezone,
+      guests: booking.guests ?? [],
+    },
+    answers: booking.answers,
+    answersByLabel: Object.fromEntries(answered.map(({ question, value }) => [question.label, value])),
+    eventType: { id: eventType.id, slug: eventType.slug, title: eventType.title, durationMinutes: eventType.durationMinutes },
+    hosts: input.hosts.map((h) => ({ id: h.id, name: h.name || h.slug, email: h.email, slug: h.slug })),
+    ...(input.hostsAdded ? { hostsAdded: input.hostsAdded } : {}),
+    ...(input.hostsRemoved ? { hostsRemoved: input.hostsRemoved } : {}),
+    link: input.link,
+  }
 }
 
 /**
@@ -157,5 +232,18 @@ export function telegramPayload(m: ChatMessage, chatId: string): Record<string, 
     parse_mode: 'HTML',
     disable_web_page_preview: true,
     text: `<b>${esc(m.headline)}</b>\n${m.lines.map(esc).join('\n')}\n<a href="${esc(m.link)}">Open booking</a>`,
+  }
+}
+
+/**
+ * n8n gets JSON, not prose: the booking's fields (`ChatMessage.data`), with
+ * the readable summary beside them for a workflow that just forwards text.
+ * A test message has no booking, and says so with `test: true`.
+ */
+export function n8nPayload(m: ChatMessage): Record<string, unknown> {
+  return {
+    ...(m.data ?? { event: 'test', test: true }),
+    summary: { headline: m.headline, lines: m.lines, text: [m.headline, ...m.lines].join('\n') },
+    link: m.link,
   }
 }

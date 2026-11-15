@@ -1810,7 +1810,7 @@ function mapChannel(row: Record<string, unknown> | null): NotificationChannel | 
     id: String(row['id']),
     ownerKind: row['owner_kind'] === 'team' ? 'team' : 'user',
     ownerId: String(row['owner_id']),
-    kind: row['kind'] === 'telegram' ? 'telegram' : 'slack',
+    kind: row['kind'] === 'telegram' ? 'telegram' : row['kind'] === 'n8n' ? 'n8n' : 'slack',
     label: String(row['label']),
     configEncrypted: String(row['config_enc']),
     keyVersion: Number(row['key_version']),
