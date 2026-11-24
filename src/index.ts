@@ -43,6 +43,8 @@ export interface Env {
   TASKS?: Queue
   BASE_URL: string
   BRAND_NAME?: string
+  /** MIK: comma list of emails that see Posting, Triggers and Links in the MIK apps bar (Permits and Meet are listed for everyone). */
+  APP_MENU_EMAILS?: string
   LEGAL_OPERATOR?: string
   DEMO_BOOKING_PATH?: string
   /** GA4 measurement id for the marketing/docs pages only — see EngineConfig.analyticsId in ports.ts. */
@@ -211,6 +213,7 @@ export function buildPorts(env: Env): EnginePorts {
     config: {
       baseUrl,
       brandName: env.BRAND_NAME ?? 'Punctual',
+      ...(env.APP_MENU_EMAILS ? { appMenuEmails: env.APP_MENU_EMAILS.split(',').map((e) => e.trim().toLowerCase()).filter(Boolean) } : {}),
       ...(env.LEGAL_OPERATOR ? { legalOperator: env.LEGAL_OPERATOR } : {}),
       ...(env.DEMO_BOOKING_PATH ? { demoBookingPath: env.DEMO_BOOKING_PATH } : {}),
       ...(env.GA_MEASUREMENT_ID ? { analyticsId: env.GA_MEASUREMENT_ID } : {}),

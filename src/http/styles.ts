@@ -564,6 +564,47 @@ input:has(+ .pu-err),select:has(+ .pu-err),textarea:has(+ .pu-err){border-color:
    first row with the wordmark and sign-out inside the 900px wrap. */
 .pu-nav{display:flex;gap:.7rem;flex-wrap:wrap;font-size:.875rem}
 .pu-dash-signout{margin:0}
+/* MIK: the shared MIK apps bar (Permits, Posting, Triggers, Links, Meet).
+   Full width above the page wrap: logo, app switcher, the dashboard
+   sections as a segmented strip, sign-out. Tokens only, so dark mode follows. */
+.mik-bar{display:flex;align-items:center;gap:1.25rem;min-height:64px;padding:0 1.5rem;
+  border-bottom:1px solid var(--pu-line);background:var(--pu-paper)}
+.mik-bar-logo{display:flex;flex:none}
+.mik-bar-logo img{height:15px;width:auto}
+.mik-bar-sep{width:1px;height:24px;background:var(--pu-line);flex:none}
+.mik-bar-switch{position:relative;flex:none}
+.mik-bar-switch summary{list-style:none;display:flex;align-items:center;gap:.35rem;height:32px;padding:0 .5rem;
+  margin-left:-.5rem;border-radius:var(--pu-radius);cursor:pointer;font-family:var(--pu-font-display);
+  font-size:.75rem;font-weight:600;letter-spacing:.24em;text-transform:uppercase;color:var(--pu-green-700)}
+.mik-bar-switch summary::-webkit-details-marker{display:none}
+.mik-bar-switch summary:hover,.mik-bar-switch[open] summary{background:var(--pu-paper-dim)}
+.mik-bar-switch summary svg{width:16px;height:16px;fill:none;stroke:currentColor;stroke-width:1.5;transition:transform .2s}
+.mik-bar-switch[open] summary svg{transform:rotate(180deg)}
+.mik-bar-menu{position:absolute;top:44px;left:0;z-index:40;width:360px;padding:6px;display:grid;
+  background:var(--pu-surface-raised);border:1px solid var(--pu-line);border-top:2px solid var(--pu-green-700);
+  border-radius:0 0 var(--pu-radius) var(--pu-radius);box-shadow:0 12px 32px -12px rgba(34,31,31,.18)}
+.mik-bar-menu a{display:grid;grid-template-columns:1fr auto;gap:.75rem;align-items:start;padding:.6rem .65rem;
+  border-radius:var(--pu-radius);color:var(--pu-text-primary);text-decoration:none}
+.mik-bar-menu a:hover,.mik-bar-menu a:focus-visible{background:var(--pu-paper-dim)}
+.mik-bar-menu a[aria-current="page"]{background:var(--pu-paper-dim)}
+.mik-bar-menu b{display:block;font-family:var(--pu-font-display);font-size:15px;font-weight:600;line-height:1.2}
+.mik-bar-menu small{display:block;font-size:13px;line-height:1.4;color:var(--pu-text-secondary)}
+.mik-bar-menu em{font-style:normal;font-size:12px;color:var(--pu-text-secondary);padding-top:2px}
+.mik-bar-views{flex:1;min-width:0;display:flex;gap:2px;overflow-x:auto;scrollbar-width:none;font-size:.8125rem}
+.mik-bar-views .pu-nav-link{flex:none;padding:7px 10px;border:0;border-radius:var(--pu-radius);font-weight:600;white-space:nowrap}
+.mik-bar-views .pu-nav-link:hover{background:var(--pu-paper-dim)}
+.mik-bar-views .pu-nav-link[aria-current="page"]{background:var(--pu-green-700);color:var(--pu-paper);border:0}
+.mik-bar-signout{margin:0;flex:none}
+.mik-bar-signout .pu-btn{padding:.4rem .8rem;font-size:.875rem}
+@media(max-width:760px){
+  .mik-bar{flex-wrap:wrap;gap:.6rem 1rem;padding:.6rem 1rem}
+  /* Only the MIK letters of the logo (they are the first ~20% of its width). */
+  .mik-bar-logo{width:36px;overflow:hidden}
+  .mik-bar-logo img{max-width:none}
+  .mik-bar-signout{margin-left:auto}
+  .mik-bar-views{order:5;flex:1 0 100%}
+  .mik-bar-menu{width:min(360px,calc(100vw - 2rem))}
+}
 /* Narrow enough that seven links cannot share a row with the wordmark and
    the sign-out button. Wordmark and sign-out keep the first row; the nav
    takes the whole second row as one horizontally scrolling strip with

@@ -892,6 +892,8 @@ export interface EngineConfig {
   /** Public origin, e.g. https://punctual.sh — used in links and .ics URLs. */
   baseUrl: string
   brandName: string
+  /** MIK: who sees the restricted apps (Posting, Triggers, Links) in the MIK apps bar. From APP_MENU_EMAILS. */
+  appMenuEmails?: readonly string[]
   /**
    * The legal entity operating this deployment, named on /privacy and /terms
    * as the data controller. Defaults to `brandName` when unset — correct for
