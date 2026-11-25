@@ -13,6 +13,21 @@
 import { sanitizeHeader } from '../../core/email-templates.js'
 import type { EmailMessage, EmailSender } from '../../ports.js'
 
+/**
+ * Give every message a reply-to when it does not already carry one.
+ *
+ * Lets a deployment send from a no-reply subdomain (good for deliverability)
+ * while guest replies still land in a monitored inbox. A message that sets its
+ * own `replyTo` keeps it: the host's copy of a booking replies to the guest.
+ */
+export function withDefaultReplyTo(sender: EmailSender, replyTo: string | undefined): EmailSender {
+  const fallback = replyTo?.trim()
+  if (!fallback) return sender
+  return {
+    send: (message) => sender.send(message.replyTo ? message : { ...message, replyTo: fallback }),
+  }
+}
+
 export interface ResendOptions {
   apiKey: string
   from: string

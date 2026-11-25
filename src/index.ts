@@ -15,7 +15,7 @@ import { createWebCrypto } from './adapters/crypto/webcrypto.js'
 import { createKvCache } from './adapters/cache/kv.js'
 import { createKvBlobCache } from './adapters/cache/kv-blob.js'
 import { createMissingBlobStorage, createR2BlobStorage } from './adapters/storage/r2-blob.js'
-import { createBrevoSender, createCloudflareSender, createConsoleSender, createResendSender } from './adapters/email/index.js'
+import { createBrevoSender, createCloudflareSender, createConsoleSender, createResendSender, withDefaultReplyTo } from './adapters/email/index.js'
 import { selectEmailDelivery } from './adapters/email/select.js'
 import { createAnalyticsEngineInsights } from './adapters/insights/analytics-engine.js'
 import { createZoneAnalytics } from './adapters/insights/zone-analytics.js'
@@ -53,6 +53,8 @@ export interface Env {
   SIGNUPS?: string
   FROM_EMAIL?: string
   FROM_NAME?: string
+  /** Default reply-to for outbound mail that does not set its own (e.g. send from a notify@ subdomain, reply to hello@). */
+  REPLY_TO_EMAIL?: string
   SUPPORT_EMAIL?: string
   /** The address on /privacy and /terms; defaults to SUPPORT_EMAIL. */
   LEGAL_EMAIL?: string
@@ -155,14 +157,16 @@ export function buildPorts(env: Env): EnginePorts {
   // a missing key or binding is a reported problem, not a quiet fallback
   // (adapters/email/select.ts).
   const { delivery: emailDelivery, problem: emailProblem } = selectEmailDelivery(env)
-  const email =
+  const email = withDefaultReplyTo(
     emailDelivery === 'cloudflare'
       ? createCloudflareSender({ binding: env.EMAIL!, from: emailFrom, fromName: emailFromName })
       : emailDelivery === 'resend'
         ? createResendSender({ apiKey: env.RESEND_API_KEY!, from: emailFrom, fromName: emailFromName })
         : emailDelivery === 'brevo'
           ? createBrevoSender({ apiKey: env.BREVO_API_KEY!, from: emailFrom, fromName: emailFromName })
-          : createConsoleSender()
+          : createConsoleSender(),
+    env.REPLY_TO_EMAIL,
+  )
 
   if (emailProblem) console.warn(`[punctual] ${emailProblem}. See /health and docs/self-hosting.md.`)
   if (emailDelivery === 'console') {
