@@ -154,6 +154,7 @@ import {
   type EventTypeFormData,
   type UpcomingBooking,
   type WeeklyDayDraft,
+  configureMikAppMenu,
 } from './pages/dashboard.js'
 
 type Env = Record<string, unknown>
@@ -189,6 +190,7 @@ const OAUTH_STATE_TTL_MS = 10 * 60 * 1000
 export function buildDashboardRoutes(ports: EnginePorts, slots: SlotService): App {
   const app: App = new Hono<{ Bindings: Env; Variables: Vars }>()
   const brandName = ports.config.brandName
+  configureMikAppMenu(ports.config.appMenuEmails ?? [])
   // Closed over beside brandName because it travels with it into every
   // DashboardChrome literal below — see emailWarningBanner in pages/dashboard.ts.
   const emailDelivery = ports.config.emailDelivery

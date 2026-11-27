@@ -8,7 +8,7 @@
 
 import { describe, expect, it } from 'vitest'
 import type { ApiKey, CalendarConnection, User } from '../../src/core/domain/types.js'
-import { apiKeysPage, connectionsPage, revokeKeyPage, settingsPage } from '../../src/http/pages/dashboard.js'
+import { apiKeysPage, configureMikAppMenu, connectionsPage, revokeKeyPage, settingsPage } from '../../src/http/pages/dashboard.js'
 
 const user: User = {
   id: 'u_host',
@@ -46,10 +46,30 @@ const listed = [{ id: 'primary', name: 'grace@gmail.example', primary: true }]
 
 describe('dashboard chrome', () => {
   it('lays the header out from the stylesheet, not an inline style the phone rule cannot beat', () => {
+    // The MIK build (the default kit) draws the shared MIK apps bar; AGD keeps .pu-dash-header.
     const html = apiKeysPage({ ...chrome, keys: [] })
-    expect(html).toContain('<header class="pu-dash-header">')
-    expect(html).toContain('<nav class="pu-nav" aria-label="Dashboard">')
-    expect(html).toContain('<form class="pu-dash-signout" method="post" action="/logout">')
+    expect(html).toContain('<header class="mik-bar">')
+    expect(html).toContain('<nav class="mik-bar-views" aria-label="Dashboard">')
+    expect(html).toContain('<form class="mik-bar-signout" method="post" action="/logout">')
+    expect(html).not.toMatch(/<header class="mik-bar"[^>]*style=/)
+  })
+
+  it('lists Posting, Triggers and Links in the MIK apps bar only for APP_MENU_EMAILS', () => {
+    try {
+      configureMikAppMenu([])
+      const everyone = apiKeysPage({ ...chrome, keys: [] })
+      expect(everyone).toContain('https://permits.mik.archi/')
+      expect(everyone).not.toContain('https://posting.mik.archi/')
+      expect(everyone).not.toContain('https://links.mik.archi/')
+
+      configureMikAppMenu(['grace@example.com'])
+      const listed = apiKeysPage({ ...chrome, keys: [] })
+      expect(listed).toContain('https://posting.mik.archi/')
+      expect(listed).toContain('https://triggers.mik.archi/')
+      expect(listed).toContain('https://links.mik.archi/')
+    } finally {
+      configureMikAppMenu([])
+    }
   })
 
   it('nudges a host with no name towards Settings, and only them', () => {

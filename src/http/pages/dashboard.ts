@@ -63,6 +63,7 @@ import {
 } from '../../core/domain/event-type-rows.js'
 import { formatInZone, localDateString, offsetLabel } from '../../core/time/zone.js'
 import type { ResolvedHost } from '../../core/domain/hosts.js'
+import { IS_AGD } from '../../brand.js'
 import { avatarHtml, brandLogoHtml, escapeHtml, hostsSentence, joinNames, logoHtml, shellFoot, shellHead } from './booking.js'
 
 // ---------------------------------------------------------------------------
@@ -152,6 +153,54 @@ export function csrfField(csrf: string): string {
  * any `<img>` on any page on the internet, and the CSRF token cannot travel on
  * a link the user might bookmark.
  */
+// ---------------------------------------------------------------------------
+// MIK: the shared MIK apps bar (Permits, Posting, Triggers, Links, Meet).
+// Only the MIK build gets it; AGD keeps the Punctual header below. The bar
+// replaces the header row; the pages under it are unchanged.
+
+let mikAppMenuEmails: readonly string[] = []
+/** Set once from EngineConfig.appMenuEmails (APP_MENU_EMAILS) when the dashboard routes are built. */
+export function configureMikAppMenu(emails: readonly string[]): void {
+  mikAppMenuEmails = emails
+}
+
+const MIK_APPS: ReadonlyArray<{ name: string; desc: string; host: string; href: string; restricted: boolean; current?: boolean }> = [
+  { name: 'Permits', desc: 'New building permits on a map', host: 'permits.mik.archi', href: 'https://permits.mik.archi/', restricted: false },
+  { name: 'Posting', desc: 'Plan and schedule LinkedIn posts', host: 'posting.mik.archi', href: 'https://posting.mik.archi/', restricted: true },
+  { name: 'Triggers', desc: 'Gmail labels that start n8n workflows', host: 'triggers.mik.archi', href: 'https://triggers.mik.archi/', restricted: true },
+  { name: 'Links', desc: 'Short links and click counts', host: 'links.mik.archi', href: 'https://links.mik.archi/dashboard/links', restricted: true },
+  { name: 'Meet', desc: 'Booking pages and meetings', host: 'meet.mikarch.com', href: '/dashboard', restricted: false, current: true },
+]
+
+function mikAppsBar(chrome: DashboardChrome, links: string): string {
+  const email = chrome.user.email.toLowerCase()
+  const apps = MIK_APPS.filter((a) => !a.restricted || mikAppMenuEmails.includes(email))
+    .map((a) => `<a href="${a.href}"${a.current ? ' aria-current="page"' : ''}><span><b>${a.name}</b><small>${a.desc}</small></span><em>${a.host}</em></a>`)
+    .join('\n      ')
+  return `<header class="mik-bar">
+  <a class="mik-bar-logo" href="/dashboard" aria-label="${escapeHtml(chrome.brandName)}">
+    <img class="pu-logo-light mik-bar-long" src="/brand/mik/logo-horizontal-black.svg" alt="" width="190" height="16">
+    <img class="pu-logo-dark mik-bar-long" src="/brand/mik/logo-horizontal-white.svg" alt="" aria-hidden="true" width="190" height="16">
+  </a>
+  <span class="mik-bar-sep" aria-hidden="true"></span>
+  <details class="mik-bar-switch">
+    <summary>Meet<svg viewBox="0 0 20 20" aria-hidden="true"><path d="M5 8l5 5 5-5"/></svg></summary>
+    <nav class="mik-bar-menu" aria-label="MIK apps">
+      ${apps}
+    </nav>
+  </details>
+  <nav class="mik-bar-views" aria-label="Dashboard">
+      ${links}
+  </nav>
+  <form class="mik-bar-signout" method="post" action="/logout">
+    ${csrfField(chrome.csrf)}
+    <button class="pu-btn pu-btn-ghost" type="submit">Sign out</button>
+  </form>
+</header>
+<script>document.addEventListener('click',function(e){var d=document.querySelector('.mik-bar-switch');if(d&&d.open&&!d.contains(e.target))d.open=false});document.addEventListener('keydown',function(e){var d=document.querySelector('.mik-bar-switch');if(e.key==='Escape'&&d&&d.open){d.open=false;d.querySelector('summary').focus()}})</script>
+`
+}
+
 function shellTop(chrome: DashboardChrome, title: string, active: NavKey | null): string {
   const links = NAV.filter((item) => item.key !== 'admin' || chrome.user.role === 'admin')
     .map((item) => {
@@ -160,8 +209,21 @@ function shellTop(chrome: DashboardChrome, title: string, active: NavKey | null)
     })
     .join('\n      ')
 
+  const head = shellHead({ title: `${title} · ${chrome.brandName}`, brandName: chrome.brandName })
+  if (!IS_AGD) {
+    const WRAP = '<div class="pu-wrap">'
+    return (
+      head.slice(0, head.length - WRAP.length) +
+      mikAppsBar(chrome, links) +
+      WRAP +
+      `<p class="pu-sr">Signed in as ${escapeHtml(chrome.user.email)}</p>` +
+      emailWarningBanner(chrome) +
+      blankNameNotice(chrome, active)
+    )
+  }
+
   return (
-    shellHead({ title: `${title} · ${chrome.brandName}`, brandName: chrome.brandName }) +
+    head +
     `<header class="pu-dash-header">
   ${brandLogoHtml('/dashboard', chrome.brandName)}
   <nav class="pu-nav" aria-label="Dashboard">
