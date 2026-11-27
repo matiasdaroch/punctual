@@ -170,6 +170,7 @@ const MIK_APPS: ReadonlyArray<{ name: string; desc: string; host: string; href: 
   { name: 'Triggers', desc: 'Gmail labels that start n8n workflows', host: 'triggers.mik.archi', href: 'https://triggers.mik.archi/', restricted: true },
   { name: 'Links', desc: 'Short links and click counts', host: 'links.mik.archi', href: 'https://links.mik.archi/dashboard/links', restricted: true },
   { name: 'Meet', desc: 'Booking pages and meetings', host: 'meet.mikarch.com', href: '/dashboard', restricted: false, current: true },
+  { name: 'Sender', desc: 'Contacts and email campaigns', host: 'sender.mik.archi', href: 'https://sender.mik.archi/admin/', restricted: true },
 ]
 
 function mikAppsBar(chrome: DashboardChrome, links: string): string {
